@@ -15,6 +15,10 @@ Routes:
   POST /api/annotate/save          -> {assignmentKey, file, dataUrl} -> marked/<file>.png + .json
   GET  /api/classroom/summary      -> ?courseId= — read-only per-assignment counts
                                      (auth via CLI `classroom auth`; errors if not configured)
+  GET  /api/classroom/courses      -> teacher courses (for dropdowns)
+  GET  /api/classroom/work         -> ?courseId= coursework list
+  POST /api/classroom/fetch        -> {courseId, courseworkId, assignmentKey}
+                                     saves missing.json (empty turn-ins = missing)
 
 Run:  python -m app.server  (default http://127.0.0.1:8000)
 """
@@ -105,6 +109,31 @@ class Handler(SimpleHTTPRequestHandler):
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
                 return
             _send_json(self, {"ok": True, "summary": summary})
+        elif parsed.path == "/api/classroom/courses":
+            from . import classroom, classroom_auth
+            try:
+                creds = classroom_auth.get_credentials()
+                courses = [{"id": c["id"], "name": c.get("name", ""),
+                            "state": c.get("courseState", "")}
+                           for c in classroom.list_courses(creds)]
+            except Exception as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
+                return
+            _send_json(self, {"ok": True, "courses": courses})
+        elif parsed.path == "/api/classroom/work":
+            from . import classroom, classroom_auth
+            course = (parse_qs(parsed.query).get("courseId") or [None])[0]
+            if not course:
+                _send_json(self, {"ok": False, "error": "courseId required"}, 400)
+                return
+            try:
+                creds = classroom_auth.get_credentials()
+                work = [{"id": w["id"], "title": w.get("title", "")}
+                        for w in classroom.list_coursework(creds, course)]
+            except Exception as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
+                return
+            _send_json(self, {"ok": True, "coursework": work})
         elif parsed.path == "/api/profile":
             from . import profiles
             _send_json(self, {"profile": profiles.current()})
@@ -226,6 +255,31 @@ class Handler(SimpleHTTPRequestHandler):
             batch.save_payload(payload)
             _send_json(self, {"ok": True,
                               "assignments": [d["key"] for d in payload.get("days", [])]})
+        elif parsed.path == "/api/classroom/fetch":
+            from . import classroom, classroom_auth
+            data = _read_json(self)
+            if not data.get("courseId") or not data.get("courseworkId") \
+                    or not data.get("assignmentKey"):
+                _send_json(self, {"ok": False,
+                                  "error": "courseId, courseworkId, assignmentKey required"},
+                           400)
+                return
+            try:
+                creds = classroom_auth.get_credentials()
+                st = classroom.fetch_status(creds, data.get("courseId", ""),
+                                            data.get("courseworkId", ""), roster.load())
+                missing.save_missing(data.get("assignmentKey", ""), st["missingIds"])
+            except Exception as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
+                return
+            names = {s["id"]: s.get("officialName", s["id"]) for s in roster.load()}
+            _send_json(self, {"ok": True,
+                              "assignmentKey": data.get("assignmentKey", ""),
+                              "submitted": [names.get(i, i) for i in st["submittedIds"]],
+                              "missing": [names.get(i, i) for i in st["missingIds"]],
+                              "empty": [names.get(i, i) for i in st["emptyIds"]],
+                              "late": [names.get(i, i) for i in st["lateIds"]],
+                              "unmapped": st["reviewIds"]})
         elif parsed.path == "/api/annotate/save":
             data = _read_json(self)
             key = data.get("assignmentKey", "2026-09-05_example_assignment")

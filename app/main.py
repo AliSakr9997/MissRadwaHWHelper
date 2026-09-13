@@ -164,6 +164,64 @@ def cmd_classroom(args: argparse.Namespace) -> int:
             print(f"- {a['title']} (due {a['due']}, max {a['maxPoints']}): "
                   f"submitted {a['submitted']}, missing {a['missing']}, late {a['late']}")
         return 0
+    if args.action == "reconcile":
+        from . import roster as _roster
+        if not args.course:
+            print("error: reconcile needs --course COURSE_ID", file=sys.stderr)
+            return 2
+        students = _roster.load()
+        rec = classroom.reconcile(creds, args.course, students)
+        print(f"matched {len(rec['matched'])}, needs-review {len(rec['review'])}, "
+              f"not-in-classroom {len(rec['unlisted'])}")
+        for m in rec["matched"]:
+            print(f"  = {m['studentId']}  <-  {m['name']}")
+        for r in rec["review"]:
+            print(f"  ? {r['name']} (uid {r['userId']})")
+        for u in rec["unlisted"]:
+            print(f"  - {u} not found in Classroom roster")
+        if getattr(args, "apply", False):
+            classroom.apply_reconcile(students, rec["matched"])
+            _roster.save(students)
+            print(f"saved classroomId for {len(rec['matched'])} students")
+        else:
+            print("preview only — re-run with --apply to write classroomIds")
+        return 0
+    if args.action == "fetch":
+        from . import missing as _missing, roster as _roster2
+        for flag in ("course", "work", "assignment"):
+            if not getattr(args, flag, None):
+                print(f"error: fetch needs --course, --work and --assignment",
+                      file=sys.stderr)
+                return 2
+        students = _roster2.load()
+        st = classroom.fetch_status(creds, args.course, args.work, students)
+        _missing.save_missing(args.assignment, st["missingIds"])
+        by_id = {s["id"]: s.get("officialName", s["id"]) for s in students}
+        print(f"submitted {len(st['submittedIds'])}, missing {len(st['missingIds'])} "
+              f"(empty turn-in {len(st['emptyIds'])}), late {len(st['lateIds'])}, "
+              f"unmapped {len(st['reviewIds'])}")
+        for sid in st["missingIds"]:
+            tag = " (turned in EMPTY)" if sid in st["emptyIds"] else ""
+            print(f"  - {by_id.get(sid, sid)}{tag}")
+        for uid in st["reviewIds"]:
+            print(f"  ? unmapped classroom uid {uid} (reconcile --apply first)")
+        return 0
+    if args.action == "download":
+        if not args.course or not args.work or not args.assignment:
+            print("error: download needs --course, --work and --assignment",
+                  file=sys.stderr)
+            return 2
+        man = classroom.download_assignment(creds, args.course, args.work,
+                                            args.assignment)
+        n_files = sum(1 for s in man["submissions"]
+                      for a in s["attachments"] if a["kind"] in ("file", "exported-pdf"))
+        print(f"downloaded {n_files} files from {len(man['submissions'])} "
+              f"submissions into {args.assignment}/original/")
+        for s in man["submissions"]:
+            for a in s["attachments"]:
+                if a["kind"] == "error":
+                    print(f"  ! {a['file']}: {a.get('error', '')}")
+        return 0
     return 2
 
 
@@ -207,8 +265,14 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--out", default=None, help="write output document to file")
     b.set_defaults(func=cmd_batch)
     c = sub.add_parser("classroom", help="Google Classroom read-only access")
-    c.add_argument("action", choices=["auth", "logout", "courses", "summary", "diagnose"])
-    c.add_argument("--course", default=None, help="course id for summary")
+    c.add_argument("action", choices=["auth", "logout", "courses", "summary", "diagnose",
+                                       "reconcile", "fetch", "download"])
+    c.add_argument("--course", default=None, help="course id")
+    c.add_argument("--work", default=None, help="courseWork id (fetch/download)")
+    c.add_argument("--assignment", default=None,
+                   help="local assignment key, e.g. 2026-09-05_hw (fetch/download)")
+    c.add_argument("--apply", action="store_true",
+                   help="reconcile: write classroomIds into the roster")
     c.add_argument("--no-browser", action="store_true",
                    help="print the Google URL instead of auto-opening a browser "
                         "(use when your default browser is the wrong Google account)")

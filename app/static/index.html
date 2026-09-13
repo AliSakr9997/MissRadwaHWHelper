@@ -119,6 +119,12 @@ td,th{border:1px solid #ddd;padding:6px}
 <section id="tab-missing" class="tab">
 <div class="card">
 <h3>Missing HW — checklist → missing list → Arabic messages</h3>
+<div class="card"><b>From Classroom</b> <small>(empty turn-ins count as missing)</small>
+<div class="row"><div><label>Course</label><select id="cCourse"></select></div>
+<div><label>Assignment</label><select id="cWork"></select></div></div>
+<label>Local assignment key</label><input id="cKey" value="2026-09-05_hw">
+<p><button class="primary" id="btnClassFetch">Fetch from Classroom</button></p>
+<div id="cResult"></div></div>
 <label>Assignment</label><select id="mAssign"></select>
 <div id="mChecks" class="card"><small>Tick students who <b>submitted</b>, then Compute.</small><div id="mList"></div></div>
 <p><button class="primary" id="btnComputeMissing">Compute missing</button>
@@ -188,12 +194,22 @@ $('btnComputeMissing').onclick=async()=>{const checked=[...document.querySelecto
 const j=await api('/api/missing/compute','POST',{assignmentKey:$('mAssign').value,submittedIds:checked});
 alert(j.ok?('Missing: '+(j.missing.join(', ')||'none')):'Error');loadMissingAll();};
 async function loadMissingAll(){const j=await api('/api/missing');
-const cur=j.byAssignment[$('mAssign').value]||[];
-$('mMissing').innerHTML='<b>Missing for '+$('mAssign').value+':</b> '+(cur.join(', ')||'none 🎉');
+const cur=j.byAssignment[$('mAssign').value]||[];$('mMissing').innerHTML='<b>Missing for '+$('mAssign').value+':</b> '+(cur.join(', ')||'none 🎉');
 $('mGrouped').innerHTML=j.byStudent.map(g=>`<div class="card"><b>${g.officialName}</b> <small>(${g.assignments.join(', ')})</small><pre>${g.message}</pre><button class="ghost" onclick="navigator.clipboard.writeText(${JSON.stringify(g.message).replace(/</g,'\\u003c')})">Copy</button></div>`).join('')||'<small>No missing 🎉</small>';}
 $('btnLoadMissing').onclick=loadMissingAll;
 $('mAssign').onchange=loadMissingAll;
 loadMissingTab();
+// classroom fetch
+async function loadCourses(){try{const j=await api('/api/classroom/courses');if(!j.ok)return;
+$('cCourse').innerHTML=j.courses.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+loadWork();}catch(e){}}
+async function loadWork(){const id=$('cCourse').value;if(!id)return;try{const j=await api('/api/classroom/work?courseId='+encodeURIComponent(id));if(!j.ok)return;
+$('cWork').innerHTML=j.coursework.map(w=>`<option value="${w.id}">${w.title}</option>`).join('');}catch(e){}}
+$('cCourse').onchange=loadWork;
+$('btnClassFetch').onclick=async()=>{const j=await api('/api/classroom/fetch','POST',{courseId:$('cCourse').value,courseworkId:$('cWork').value,assignmentKey:$('cKey').value});
+if(!j.ok){$('cResult').textContent='Error: '+j.error;return;}
+$('cResult').innerHTML='<b>Saved to '+j.assignmentKey+'</b><br>Missing: '+(j.missing.join(', ')||'none')+(j.empty.length?'<br>Empty turn-ins: '+j.empty.join(', '):'')+(j.unmapped.length?'<br>Unmapped: '+j.unmapped.length+' (see CLI reconcile)':'');loadMissingTab();};
+loadCourses();
 // batch
 let batchPayload=null;
 $('btnBatchPreview').onclick=async()=>{const j=await api('/api/batch/preview','POST',{text:$('bText').value,dates:$('bDates').value,year:$('bYear').value});
