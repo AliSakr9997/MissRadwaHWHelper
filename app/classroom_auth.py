@@ -61,7 +61,11 @@ def get_credentials(open_browser: bool = True):
                 creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET_FILE), SCOPES)
-                creds = flow.run_local_server(port=0, open_browser=open_browser)
+                # prompt="consent": always show the full permission list instead of
+                # silently re-approving a stale grant (the cause of scope-mismatch
+                # failures). access_type="offline": ensure a refresh token is issued.
+                creds = flow.run_local_server(port=0, open_browser=open_browser,
+                                              prompt="consent", access_type="offline")
         except Exception as e:
             msg = str(e)
             if "scope" in msg.lower():
