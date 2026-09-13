@@ -161,7 +161,8 @@ def get_credentials(open_browser: bool = True):
                 # equivalent scope server-side (observed: coursework.students
                 # -> student-submissions.students).
                 flow.oauth2session.scope = granted
-                creds = flow.fetch_token(code=code)
+                flow.fetch_token(code=code)
+                creds = flow.credentials
                 import json as _json
                 scopes_path().write_text(_json.dumps(granted), encoding="utf-8")
         except AuthError:
