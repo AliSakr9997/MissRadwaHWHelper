@@ -277,6 +277,12 @@ def download_assignment(creds, course_id: str, coursework_id: str,
                 title = df.get("title") or fid
                 safe = _re.sub(r'[<>:"/\\|?*]', "", title).strip() or fid
                 dest = dirs["original"] / f"{s.get('userId', 'unknown')}__{safe}"
+                n = 2
+                while dest.exists():
+                    # Same-titled attachments (e.g. 3x "Photo.pdf") must not
+                    # overwrite each other.
+                    dest = dirs["original"] / f"{s.get('userId', 'unknown')}__{safe}__{n}"
+                    n += 1
                 try:
                     kind = _download_drive_file(drive, fid, dest)
                     got.append({"kind": kind, "file": dest.name, "driveId": fid})

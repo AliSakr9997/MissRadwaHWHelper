@@ -11,6 +11,11 @@ Routes:
   POST /api/report/approve         -> appends to homework/<key>/reports.json
   POST /api/batch/preview          -> {text, dates, year} -> {output, payload}
   POST /api/batch/approve          -> {payload} -> saves reports + missing
+  POST /api/ai/config               -> save {provider, model, api_key, base_url}
+  GET  /api/ai/config               -> masked config + provider/model lists
+  POST /api/ai/test                 -> test connection (ok/fail only, no key echo)
+  POST /api/ai/preview              -> {text, dates, year} -> {output, payload}
+  POST /api/ai/approve              -> {payload} -> saves reports + missing
   GET  /homework/...               -> static files (PDFs)
   POST /api/annotate/save          -> {assignmentKey, file, dataUrl} -> marked/<file>.png + .json
   GET  /api/classroom/summary      -> ?courseId= — read-only per-assignment counts
@@ -137,6 +142,13 @@ class Handler(SimpleHTTPRequestHandler):
         elif parsed.path == "/api/profile":
             from . import profiles
             _send_json(self, {"profile": profiles.current()})
+        elif parsed.path == "/api/ai/config" and self.command == "GET":
+            from . import ai_config, ai_providers
+            cfg = ai_config.masked()
+            models = {p: cls.default_models()
+                      for p, cls in ai_providers.PROVIDERS.items()}
+            _send_json(self, {"ok": True, "config": cfg,
+                              "providers": sorted(models), "models": models})
         elif parsed.path.startswith("/homework/"):
             from . import profiles
             hwroot = profiles.homework_dir().resolve()
@@ -293,6 +305,59 @@ class Handler(SimpleHTTPRequestHandler):
                 json.dumps({"strokes": data.get("strokes", []), "file": data.get("file")},
                            ensure_ascii=False), encoding="utf-8")
             _send_json(self, {"ok": True})
+        elif parsed.path == "/api/ai/config":
+            from . import ai_config, ai_providers
+            data = _read_json(self)
+            if data.get("provider", "").lower() not in ai_providers.PROVIDERS:
+                _send_json(self, {"ok": False, "error": "unknown provider"}, 400)
+                return
+            cur = ai_config.load()
+            key = data.get("api_key", "")
+            if not key:
+                key = cur.get("api_key", "")  # blank = keep existing key
+            saved = ai_config.save(data.get("provider", ""), data.get("model", ""),
+                                   key, data.get("base_url", ""))
+            _send_json(self, {"ok": True, "config": saved})
+        elif parsed.path == "/api/ai/test":
+            from . import ai_config, ai_providers
+            try:
+                provider, model, key = ai_config.credentials()
+                cfg = ai_config.load()
+                prov = ai_providers.create(provider, key, cfg.get("base_url", ""))
+            except Exception as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
+                return
+            ok, msg = prov.test(model)
+            _send_json(self, {"ok": ok, "message": msg})
+        elif parsed.path == "/api/ai/preview":
+            from . import ai_config, ai_reports
+            data = _read_json(self)
+            students = roster.load()
+            dates = [d.strip() for d in str(data.get("dates", "")).split(",") if d.strip()]
+            try:
+                provider, model, key = ai_config.credentials()
+                cfg = ai_config.load()
+                raw = ai_reports.interpret(data.get("text", ""), provider, model,
+                                           key, cfg.get("base_url", ""))
+                payload = ai_reports.to_batch_payload(raw, students,
+                                                      year=data.get("year", "Y8"),
+                                                      default_dates=dates)
+            except Exception as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
+                return
+            output = batch.render_output(payload, students)
+            _send_json(self, {"ok": True, "output": output, "payload": payload,
+                              "needsReview": sorted({r["officialName"]
+                                                     for r in payload["needsReview"]})})
+        elif parsed.path == "/api/ai/approve":
+            data = _read_json(self)
+            payload = data.get("payload")
+            if not payload:
+                _send_json(self, {"ok": False, "error": "payload required"}, 400)
+                return
+            batch.save_payload(payload)
+            _send_json(self, {"ok": True,
+                              "assignments": [d["key"] for d in payload.get("days", [])]})
         else:
             self.send_error(404)
 

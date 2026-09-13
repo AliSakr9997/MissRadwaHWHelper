@@ -76,6 +76,23 @@ myaccount.google.com → Security → Third-party access, run
 `python -m app.main classroom logout`, then `auth` again keeping ALL
 permission checkboxes ticked.
 
+## AI reports (optional, your own key)
+
+Deterministic batch paste always works offline. For free-form wording, add an
+AI provider (tab **3 · AI** or CLI). The AI only extracts structured data —
+the app validates everything (roster, grade bounds, dates) and renders:
+
+```powershell
+python -m app.main ai config show
+python -m app.main ai set --provider openrouter --model openai/gpt-4o-mini --key YOUR_KEY
+python -m app.main ai test
+python -m app.main ai run --file paste.txt --dates 2026-09-05,2026-09-07
+```
+
+Providers: openai, openrouter, groq, mistral, anthropic, google, custom
+(any OpenAI-compatible URL, e.g. local LM Studio). Keys stay in gitignored
+`data/<profile>/ai_config.json` and are never echoed back.
+
 ## Second teacher (same or another machine)
 
 Each teacher gets an isolated profile (own roster, token, homework):

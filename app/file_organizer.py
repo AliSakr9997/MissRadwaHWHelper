@@ -1,6 +1,7 @@
 """File organizer: one clean PDF per student in homework/<assignment>/.
 
 - PDF in -> copy/rename to '<Official Name>.pdf' (or _v2 on resubmit)
+- Multiple PDFs in -> merged to single '<Official Name>.pdf' (pypdf)
 - Images in -> sort by name, merge to single '<Official Name>.pdf' (Pillow)
 - Links -> appended to links.txt (list-only for MVP)
 - Illegal filename chars stripped; duplicates get ' (2)' suffix.
@@ -103,6 +104,97 @@ def images_to_pdf(image_paths: list[Path], dest: Path) -> Path:
 def normalize_images(image_paths: list[Path], normalized_dir: Path, official_name: str) -> Path:
     dest = next_unique_pdf(normalized_dir, official_name)
     return images_to_pdf(image_paths, dest)
+
+
+def merge_pdfs(pdf_paths: list[Path], dest: Path) -> Path:
+    """Merge sorted PDFs into one PDF via pypdf. Raises on empty/corrupt."""
+    from pypdf import PdfReader, PdfWriter
+
+    ordered = sorted(pdf_paths, key=lambda p: p.name.lower())
+    if not ordered:
+        raise ValueError("no pdfs provided")
+    writer = PdfWriter()
+    for p in ordered:
+        reader = PdfReader(str(p))
+        if reader.is_encrypted:
+            raise ValueError(f"encrypted pdf, open manually: {p.name}")
+        for page in reader.pages:
+            writer.add_page(page)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with dest.open("wb") as f:
+        writer.write(f)
+    return dest
+
+
+def normalize_pdfs(pdf_paths: list[Path], normalized_dir: Path, official_name: str) -> Path:
+    if len(pdf_paths) == 1:
+        return normalize_pdf(pdf_paths[0], normalized_dir, official_name)
+    dest = next_unique_pdf(normalized_dir, official_name)
+    return merge_pdfs(pdf_paths, dest)
+
+
+def dedupe_files(paths: list[Path]) -> tuple[list[Path], int]:
+    """Drop byte-identical duplicates (students often attach the same file
+    twice). Returns (unique paths, duplicate count)."""
+    import hashlib as _hl
+    seen: dict[str, Path] = {}
+    dups = 0
+    for p in sorted(paths, key=lambda x: x.name.lower()):
+        h = _hl.sha256(p.read_bytes()).hexdigest()
+        if h in seen:
+            dups += 1
+        else:
+            seen[h] = p
+    return list(seen.values()), dups
+
+
+def organize_originals(assignment_key: str, uid_to_official: dict[str, str]) -> dict:
+    """Group original/ files by Classroom userId prefix and normalize per student.
+
+    Returns {official_name: {"pdf": path|None, "images": [...], "skipped": [...],
+    "dest": path|None, "error": str|None}}.
+    """
+    dirs = assignment_dirs(assignment_key)
+    by_uid: dict[str, list[Path]] = {}
+    for p in sorted(dirs["original"].iterdir()):
+        if not p.is_file() or "__" not in p.name:
+            continue
+        uid, _ = p.name.split("__", 1)
+        by_uid.setdefault(uid, []).append(p)
+    report = {}
+    for uid, files in by_uid.items():
+        official = uid_to_official.get(uid)
+        if official is None:
+            report[uid] = {"dest": None, "skipped": [f.name for f in files],
+                           "error": "uid not in roster (other student)"}
+            continue
+        pdfs = [f for f in files if f.suffix.lower() == ".pdf"]
+        imgs = [f for f in files if f.suffix.lower() in IMAGE_EXTS]
+        other = [f for f in files
+                 if f.suffix.lower() not in IMAGE_EXTS | {".pdf"}]
+        pdfs, pdf_dups = dedupe_files(pdfs)
+        imgs, img_dups = dedupe_files(imgs)
+        try:
+            if pdfs and not imgs:
+                dest = normalize_pdfs(pdfs, dirs["normalized"], official)
+            elif imgs and not pdfs:
+                dest = normalize_images(imgs, dirs["normalized"], official)
+            elif pdfs and imgs:
+                dest = None
+                raise ValueError("mixed pdf+images, merge manually")
+            else:
+                dest = None
+            report[official] = {"dest": str(dest) if dest else None,
+                                "pdf": [f.name for f in pdfs],
+                                "images": [f.name for f in imgs],
+                                "dups_dropped": pdf_dups + img_dups,
+                                "skipped": [f.name for f in other], "error": None}
+        except Exception as e:
+            report[official] = {"dest": None,
+                                "pdf": [f.name for f in pdfs],
+                                "images": [f.name for f in imgs],
+                                "skipped": [f.name for f in other], "error": str(e)[:200]}
+    return report
 
 
 def record_link(assignment_key: str, official_name: str, url: str) -> None:

@@ -32,12 +32,22 @@ def resolve_batch(sections: list[dict], iso_dates: list[str], students: list[dic
                     item["error"] = "no grade found"
                     item["text"] = ""
                 else:
-                    item["text"] = report_engine.format_report(
-                        official_name=official, year=year, day=day, month=month, weekday=weekday,
-                        ontime=not e.get("late", False), mistakes=e.get("mistakes", 0),
-                        skipped=e.get("skipped", 0), understanding=e.get("understanding") or None,
-                        grade_num=e["grade_num"], grade_den=e["grade_den"],
-                        note=e.get("note", ""), rules=rules)
+                    try:
+                        item["text"] = report_engine.format_report(
+                            official_name=official, year=year, day=day, month=month,
+                            weekday=weekday,
+                            ontime=not e.get("late", False), mistakes=e.get("mistakes", 0),
+                            skipped=e.get("skipped", 0),
+                            understanding=e.get("understanding") or None,
+                            grade_num=e["grade_num"], grade_den=e["grade_den"],
+                            note=e.get("note", ""), rules=rules)
+                    except (TypeError, ValueError):
+                        # Bad numbers (e.g. AI-invented 99/54) never render:
+                        # they become Needs Review instead.
+                        item["error"] = (f"invalid numbers "
+                                         f"{e.get('grade_num')}/{e.get('grade_den')}")
+                        item["text"] = ""
+                        item["needsReview"] = True
             else:
                 status = "missing" if e["type"] == "missing" else "not_on_classroom"
                 item["text"] = report_engine.format_status_report(

@@ -33,9 +33,10 @@ td,th{border:1px solid #ddd;padding:6px}
 <nav>
 <button data-tab="reports" class="active">1 · Reports</button>
 <button data-tab="batch">2 · Batch paste</button>
-<button data-tab="files">3 · Files &amp; Mark</button>
-<button data-tab="roster">4 · Roster</button>
-<button data-tab="missing">5 · Missing HW</button>
+<button data-tab="airep">3 · AI ✨</button>
+<button data-tab="files">4 · Files &amp; Mark</button>
+<button data-tab="roster">5 · Roster</button>
+<button data-tab="missing">6 · Missing HW</button>
 </nav>
 
 <!-- REPORTS -->
@@ -81,6 +82,32 @@ td,th{border:1px solid #ddd;padding:6px}
 <button class="ghost" id="btnBatchCopy">Copy output</button></p>
 <div id="bReview" class="warn" style="display:none"></div>
 <pre id="bOut">Output appears here…</pre>
+</div>
+</section>
+
+<!-- AI REPORTS -->
+<section id="tab-airep" class="tab">
+<div class="card">
+<h3>AI provider (your own key, stored only on this machine)</h3>
+<div class="row"><div><label>Provider</label><select id="aProv"></select></div>
+<div><label>Model</label><input id="aModel" list="aModelList" placeholder="e.g. gpt-4o-mini"><datalist id="aModelList"></datalist></div></div>
+<label>API key</label><input id="aKey" type="password" placeholder="never shown back, only ····last4">
+<label>Base URL (custom provider only)</label><input id="aUrl" placeholder="http://localhost:1234/v1">
+<p><button class="primary" id="btnAiSave">Save config</button>
+<button class="ghost" id="btnAiTest">Test connection</button>
+<span id="aStatus"><small></small></span></p>
+</div>
+<div class="card">
+<h3>Free-form log → AI → validated reports</h3>
+<small>Write naturally — no rigid syntax. Numbers/names are validated by the app; anything unclear becomes Needs Review.</small>
+<label>Paste</label><textarea id="aText" rows="8" placeholder="Reem did 46 out of 54, 8 mistakes, very good..."></textarea>
+<div class="row"><div><label>Dates per day section (comma ISO)</label><input id="aDates" value="2026-09-05"></div>
+<div><label>Year</label><input id="aYear" value="Y8"></div></div>
+<p><button class="primary" id="btnAiPreview">Preview all</button>
+<button class="ghost" id="btnAiApprove" disabled>Approve all &amp; save</button>
+<button class="ghost" id="btnAiCopy">Copy output</button></p>
+<div id="aReview" class="warn" style="display:none"></div>
+<pre id="aOut">Output appears here…</pre>
 </div>
 </section>
 
@@ -219,5 +246,25 @@ $('bReview').style.display=j.needsReview.length?'block':'none';
 $('bReview').textContent=j.needsReview.length?('Needs Review: '+j.needsReview.join(', ')):'';};
 $('btnBatchApprove').onclick=async()=>{if(!batchPayload)return;const j=await api('/api/batch/approve','POST',{payload:batchPayload});alert(j.ok?('Saved: '+j.assignments.join(', ')):'Error');};
 $('btnBatchCopy').onclick=()=>{navigator.clipboard.writeText($('bOut').textContent);};
+// AI tab
+let aiModels={}, aiPayload=null;
+async function loadAiCfg(){const j=await api('/api/ai/config');if(!j.ok)return;
+aiModels=j.models||{};$('aProv').innerHTML=j.providers.map(p=>`<option ${p===j.config.provider?'selected':''}>${p}</option>`).join('');
+fillModels();if(j.config.model)$('aModel').value=j.config.model;
+if(j.config.base_url)$('aUrl').value=j.config.base_url;
+if(j.config.api_key_hint)$('aKey').placeholder='saved '+j.config.api_key_hint+' (leave blank to keep)';}
+function fillModels(){const ms=aiModels[$('aProv').value]||[];$('aModelList').innerHTML=ms.map(m=>`<option value="${m}">`).join('');}
+$('aProv').onchange=fillModels;
+$('btnAiSave').onclick=async()=>{const j=await api('/api/ai/config','POST',{provider:$('aProv').value,model:$('aModel').value,api_key:$('aKey').value,base_url:$('aUrl').value});
+$('aStatus').textContent=j.ok?'Saved.':'Error: '+j.error;};
+$('btnAiTest').onclick=async()=>{$('aStatus').textContent='Testing…';const j=await api('/api/ai/test','POST',{});$('aStatus').textContent=j.ok?('OK: '+j.message):('FAILED: '+j.message);};
+$('btnAiPreview').onclick=async()=>{const j=await api('/api/ai/preview','POST',{text:$('aText').value,dates:$('aDates').value,year:$('aYear').value});
+if(!j.ok){$('aOut').textContent='Error: '+j.error;return;}
+$('aOut').textContent=j.output;aiPayload=j.payload;$('btnAiApprove').disabled=false;
+$('aReview').style.display=j.needsReview.length?'block':'none';
+$('aReview').textContent=j.needsReview.length?('Needs Review: '+j.needsReview.join(', ')):'';};
+$('btnAiApprove').onclick=async()=>{if(!aiPayload)return;const j=await api('/api/ai/approve','POST',{payload:aiPayload});alert(j.ok?('Saved: '+j.assignments.join(', ')):'Error');};
+$('btnAiCopy').onclick=()=>{navigator.clipboard.writeText($('aOut').textContent);};
+loadAiCfg();
 </script>
 </body></html>

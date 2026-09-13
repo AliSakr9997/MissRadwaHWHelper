@@ -62,6 +62,22 @@ def cmd_organize(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_organize_auto(args: argparse.Namespace) -> int:
+    students = roster.load()
+    mapping = {s["classroomId"]: s["officialName"] for s in students if s.get("classroomId")}
+    report = file_organizer.organize_originals(args.assignment, mapping)
+    for key in sorted(report):
+        r = report[key]
+        if r.get("dest"):
+            extra = f" (+{r['dups_dropped']} dups dropped)" if r.get("dups_dropped") else ""
+            print(f"OK  {key} -> {Path(r['dest']).name}{extra}")
+        else:
+            print(f"SKIP {key}: {r.get('error', '')}")
+    if any(r.get("error") for r in report.values()):
+        return 3
+    return 0
+
+
 def cmd_missing(args: argparse.Namespace) -> int:
     students = roster.load()
     by_id = {s["id"]: s for s in students}
@@ -83,6 +99,73 @@ def cmd_missing(args: argparse.Namespace) -> int:
         print(missing.build_student_message(st, keys))
         print()
     return 0
+
+
+def cmd_ai(args: argparse.Namespace) -> int:
+    from . import ai_config, ai_providers, ai_reports
+    if args.action in ("config", "show"):
+        import json as _json
+        print(_json.dumps(ai_config.masked(), ensure_ascii=False, indent=2))
+        print(f"providers: {', '.join(sorted(ai_providers.PROVIDERS))}")
+        return 0
+    if args.action == "set":
+        if args.provider and args.provider.lower() not in ai_providers.PROVIDERS:
+            print(f"error: unknown provider (choose: "
+                  f"{', '.join(sorted(ai_providers.PROVIDERS))})", file=sys.stderr)
+            return 2
+        cur = ai_config.load()
+        saved = ai_config.save(args.provider or cur.get("provider", "openai"),
+                               args.model or cur.get("model", ""),
+                               args.key if args.key is not None else cur.get("api_key", ""),
+                               args.url if args.url is not None else cur.get("base_url", ""))
+        import json as _json
+        print(_json.dumps(saved, ensure_ascii=False, indent=2))
+        return 0
+    if args.action == "test":
+        try:
+            provider, model, key = ai_config.credentials()
+            cfg = ai_config.load()
+            prov = ai_providers.create(provider, key, cfg.get("base_url", ""))
+        except Exception as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        ok, msg = prov.test(model)
+        print(("connection ok: " if ok else "connection FAILED: ") + msg)
+        return 0 if ok else 1
+    if args.action == "run":
+        from . import batch as _batch
+        if not args.file or not args.dates:
+            print("error: run needs --file and --dates", file=sys.stderr)
+            return 2
+        try:
+            provider, model, key = ai_config.credentials()
+            cfg = ai_config.load()
+        except Exception as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        text = Path(args.file).read_text(encoding="utf-8")
+        students = roster.load()
+        dates = [d.strip() for d in args.dates.split(",") if d.strip()]
+        try:
+            raw = ai_reports.interpret(text, provider, model, key, cfg.get("base_url", ""))
+            payload = ai_reports.to_batch_payload(raw, students, year=args.year,
+                                                  default_dates=dates)
+        except Exception as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        out = _batch.render_output(payload, students)
+        if args.save:
+            _batch.save_payload(payload)
+        if args.out:
+            Path(args.out).write_text(out, encoding="utf-8")
+        else:
+            print(out, end="")
+        if payload["needsReview"]:
+            names = sorted({r["officialName"] for r in payload["needsReview"]})
+            print(f"\n[Needs Review: {', '.join(names)}]", file=sys.stderr)
+            return 3
+        return 0
+    return 2
 
 
 def cmd_batch(args: argparse.Namespace) -> int:
@@ -251,6 +334,9 @@ def build_parser() -> argparse.ArgumentParser:
     o.add_argument("--images", nargs="*", default=None)
     o.add_argument("--link", action="append", default=None)
     o.set_defaults(func=cmd_organize)
+    oa = sub.add_parser("organize-auto", help="normalize a whole assignment via roster classroomIds")
+    oa.add_argument("--assignment", required=True)
+    oa.set_defaults(func=cmd_organize_auto)
     m = sub.add_parser("missing", help="compute missing lists + Arabic messages")
     m.add_argument("--assignment", default=None)
     m.add_argument("--compute", action="store_true",
@@ -277,6 +363,19 @@ def build_parser() -> argparse.ArgumentParser:
                    help="print the Google URL instead of auto-opening a browser "
                         "(use when your default browser is the wrong Google account)")
     c.set_defaults(func=cmd_classroom)
+    a = sub.add_parser("ai", help="AI provider config + AI report runs")
+    a.add_argument("action", choices=["config", "show", "set", "test", "run"])
+    a.add_argument("--provider", default=None,
+                   help="openai|openrouter|groq|mistral|custom|anthropic|google")
+    a.add_argument("--model", default=None)
+    a.add_argument("--key", default=None, help="API key (stored gitignored)")
+    a.add_argument("--url", default=None, help="base URL for custom provider")
+    a.add_argument("--file", default=None, help="run: pasted log file")
+    a.add_argument("--dates", default=None, help="run: comma ISO dates")
+    a.add_argument("--year", default="Y8")
+    a.add_argument("--save", action="store_true")
+    a.add_argument("--out", default=None)
+    a.set_defaults(func=cmd_ai)
     return p
 
 
