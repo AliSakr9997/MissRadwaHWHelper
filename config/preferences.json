@@ -1,0 +1,11 @@
+{
+  "timezone": "Africa/Cairo",
+  "mode": "local-first-offline",
+  "hosting": "none-localhost-only",
+  "teacherInput": "both-structured-form-default-plus-freetext-shortcut",
+  "distribution": "manual-copy-paste",
+  "resubmitPolicy": "version-both",
+  "linkSubmissions": "list-only",
+  "rosterSourceOfTruth": "local-students.json",
+  "rosterEditor": "simple-ui"
+}

@@ -1,0 +1,52 @@
+{
+  "version": 2,
+  "timezone": "Africa/Cairo",
+  "date_source": "courseWork.dueDate",
+  "late_policy": "strict",
+  "notes": "Thresholds are changeable later. Local file wins for names. AI must not alter numbers.",
+  "rules": {
+    "mistakes": [
+      { "range": "0", "label": "Mistakes (none) 🟢" },
+      { "range": "1-4", "emoji": "🟢" },
+      { "range": "5+", "emoji": "🔴" }
+    ],
+    "skipped": [
+      { "range": "0", "emoji": "🟢", "label": "Skipped questions (none) 🟢" },
+      { "range": "1-2", "emoji": "", "label": "Skipped questions ({n})" },
+      { "range": "3+", "emoji": "🔴", "label": "Skipped questions ({n}) 🔴" }
+    ],
+    "understanding": [
+      { "match": "excellent + full mark (grade_num == grade_den)", "emoji": "⭐" },
+      { "match": "excellent with mistakes", "emoji": "🟢" },
+      { "match": "very good", "emoji": "🟢" },
+      { "match": "poor", "emoji": "🔴" },
+      { "match": "good|weak", "emoji": "" }
+    ],
+    "understanding_infer": {
+      "when": "understanding missing and grade ratio below threshold",
+      "below_ratio": 0.5,
+      "label": "poor"
+    },
+    "submission": [
+      { "match": "ontime", "label": "HW sent ontime 🟢" },
+      { "match": "late", "label": "HW sent late 🔴" }
+    ],
+    "status": [
+      { "match": "missing", "label": "❌ Did not send HW" },
+      { "match": "not_on_classroom", "label": "⚠️ Not on Classroom" }
+    ],
+    "note_fixes": [
+      { "find": "PDF not photo", "replace": "PDF, not photo" }
+    ]
+  },
+  "formatting": {
+    "header": "📝HW Report",
+    "line2": "{OfficialName} (Y{year} {d}/{m} {Weekday})",
+    "note_header": "‼️NOTE‼️"
+  },
+  "validation": {
+    "numbers_immutable": true,
+    "grade_num_lte_den": true,
+    "require_preview_approve": true
+  }
+}

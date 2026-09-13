@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MissRadwaHWHelper (offline)</title>
+<style>
+body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f5f5f5;color:#222}
+header{background:#1f6feb;color:#fff;padding:10px 16px}
+nav button{margin:4px;padding:8px 14px;border:0;border-radius:6px;cursor:pointer}
+nav button.active{background:#1f6feb;color:#fff}
+.tab{display:none;padding:16px;max-width:1100px;margin:auto}
+.tab.active{display:block}
+.card{background:#fff;border-radius:8px;padding:14px;margin:10px 0;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+label{display:block;margin:6px 0 2px;font-weight:600}
+input,select,textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+pre{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px}
+button.primary{background:#1f6feb;color:#fff;border:0;padding:9px 16px;border-radius:6px;cursor:pointer}
+button.ghost{background:#eee;border:0;padding:9px 12px;border-radius:6px;cursor:pointer}
+#viewerWrap{position:relative;border:1px solid #ccc;background:#999}
+#pdfEmbed{width:100%;height:70vh;background:#fff}
+#overlay{position:absolute;inset:0;touch-action:none;cursor:crosshair}
+.toolbar button{margin-right:6px}
+.warn{background:#fff3cd;padding:8px;border-radius:6px}
+table{width:100%;border-collapse:collapse}
+td,th{border:1px solid #ddd;padding:6px}
+</style>
+</head>
+<body>
+<header><b>MissRadwaHWHelper</b> — offline localhost &nbsp;<small>AI does admin · teacher does judgment</small></header>
+<div style="max-width:1100px;margin:auto;padding:8px">
+<nav>
+<button data-tab="reports" class="active">1 · Reports</button>
+<button data-tab="batch">2 · Batch paste</button>
+<button data-tab="files">3 · Files &amp; Mark</button>
+<button data-tab="roster">4 · Roster</button>
+<button data-tab="missing">5 · Missing HW</button>
+</nav>
+
+<!-- REPORTS -->
+<section id="tab-reports" class="tab active">
+<div class="card">
+<h3>Teacher summary → Preview → Approve → Copy</h3>
+<label>Assignment key</label><input id="rKey" value="2026-09-05_example_assignment">
+<div class="row">
+<div><label>Student (official name / variant)</label><input id="rStudent" placeholder="Sara Ali"></div>
+<div><label>Or paste free-text shortcut</label><textarea id="rFree" rows="2" placeholder="Sara Ali&#10;46/54&#10;8 mistakes&#10;Very good&#10;Note: ..."></textarea></div>
+</div>
+<div class="row">
+<div><label>Grade num / den</label><div class="row"><input id="rNum" type="number" value="46"><input id="rDen" type="number" value="54"></div></div>
+<div><label>Date (ISO) + class year</label><div class="row"><input id="rDate" value="2026-09-05"><input id="rYear" value="Y8"></div></div>
+</div>
+<div class="row">
+<div><label>Mistakes</label><input id="rMis" type="number" value="8"></div>
+<div><label>Skipped</label><input id="rSkip" type="number" value="0"></div>
+</div>
+<div class="row">
+<div><label>Understanding</label><select id="rUnd"><option>excellent</option><option selected>very good</option><option>good</option><option>weak</option><option>poor</option></select></div>
+<div><label>Submission</label><select id="rOntime"><option value="1" selected>ontime</option><option value="0">late</option></select></div>
+</div>
+<label>Note</label><textarea id="rNote" rows="2">Study again the fraction flipping in dividing</textarea>
+<p><button class="primary" id="btnPreview">Preview</button>
+<button class="ghost" id="btnApprove" disabled>Approve &amp; save</button>
+<button class="ghost" id="btnCopy">Copy report</button></p>
+<div id="needsReview" class="warn" style="display:none">Needs Review: name did not match roster exactly.</div>
+<pre id="preview">Preview appears here…</pre>
+</div>
+</section>
+
+<!-- BATCH -->
+<section id="tab-batch" class="tab">
+<div class="card">
+<h3>Batch paste — full log → full output document</h3>
+<label>Paste (day sections separated by <code>-----</code> / <code>Monday HW</code> lines)</label>
+<textarea id="bText" rows="10" placeholder="Sara Ali&#10;Didn't send hw&#10;&#10;Omar Khaled&#10;46/54&#10;..."></textarea>
+<div class="row"><div><label>Dates per day section (comma ISO)</label><input id="bDates" value="2026-09-05,2026-09-07"></div>
+<div><label>Year</label><input id="bYear" value="Y8"></div></div>
+<p><button class="primary" id="btnBatchPreview">Preview all</button>
+<button class="ghost" id="btnBatchApprove" disabled>Approve all &amp; save</button>
+<button class="ghost" id="btnBatchCopy">Copy output</button></p>
+<div id="bReview" class="warn" style="display:none"></div>
+<pre id="bOut">Output appears here…</pre>
+</div>
+</section>
+
+<!-- FILES & MARK -->
+<section id="tab-files" class="tab">
+<div class="card">
+<h3>Files per assignment + stylus marking</h3>
+<label>Assignment</label><select id="fAssign"></select>
+<label>PDF file</label><select id="fFile"></select>
+<div class="toolbar">
+<button class="ghost" data-tool="pen">✏️ Pen</button>
+<button class="ghost" data-tool="hl">🖍️ Highlighter</button>
+<button class="ghost" data-tool="eraser">🧽 Eraser</button>
+<button class="ghost" id="btnUndo">↩️ Undo</button>
+<button class="ghost" id="btnClear">🗑️ Clear</button>
+<button class="primary" id="btnSaveMarks">💾 Save marks</button>
+</div>
+<div id="viewerWrap"><embed id="pdfEmbed"><canvas id="overlay"></canvas></div>
+<small>Tip: use tablet stylus — pointer events with pressure supported. Overlay saves as PNG next to the PDF in <code>marked/</code>.</small>
+</div>
+</section>
+
+<!-- ROSTER -->
+<section id="tab-roster" class="tab">
+<div class="card">
+<h3>Roster — local file wins</h3>
+<p><button class="ghost" id="btnLoadRoster">Reload</button>
+<button class="primary" id="btnSaveRoster">Save roster</button>
+<button class="ghost" id="btnAddRow">+ Add student</button></p>
+<table><thead><tr><th>id</th><th>officialName</th><th>arabicFirst</th><th>m/f</th><th>classroomId</th><th>variants (comma)</th><th>active</th><th>onClass</th></tr></thead>
+<tbody id="rosterBody"></tbody></table>
+</div>
+</section>
+
+<!-- MISSING -->
+<section id="tab-missing" class="tab">
+<div class="card">
+<h3>Missing HW — checklist → missing list → Arabic messages</h3>
+<label>Assignment</label><select id="mAssign"></select>
+<div id="mChecks" class="card"><small>Tick students who <b>submitted</b>, then Compute.</small><div id="mList"></div></div>
+<p><button class="primary" id="btnComputeMissing">Compute missing</button>
+<button class="ghost" id="btnLoadMissing">Reload all missing</button></p>
+<div id="mMissing"></div>
+<h3>Grouped by student (ready to copy)</h3>
+<div id="mGrouped"></div>
+</div>
+</section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+b.classList.add('active');$('tab-'+b.dataset.tab).classList.add('active');});
+async function api(p,m,b){const r=await fetch(p,{method:m||'GET',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});return r.json();}
+// reports
+$('btnPreview').onclick=async()=>{
+const body={assignmentKey:$('rKey').value,student_query:$('rStudent').value,freeText:$('rFree').value||undefined,
+grade_num:$('rNum').value?+$('rNum').value:undefined,grade_den:$('rDen').value?+$('rDen').value:undefined,
+mistakes:+$('rMis').value,skipped:+$('rSkip').value,understanding:$('rUnd').value,ontime:$('rOntime').value==='1',
+note:$('rNote').value,iso_date:$('rDate').value,year:$('rYear').value,
+day:+$('rDate').value.split('-')[2],month:+$('rDate').value.split('-')[1]};
+const j=await api('/api/report/preview','POST',body);
+if(!j.ok){$('preview').textContent='Error: '+j.error;return;}
+$('preview').textContent=j.report;$('needsReview').style.display=j.needsReview?'block':'none';
+$('btnApprove').disabled=false;$('btnApprove').onclick=async()=>{
+const s=await api('/api/report/approve','POST',{assignmentKey:$('rKey').value,studentId:j.officialName,officialName:j.officialName,teacherInput:body,finalReport:j.report});
+alert(s.ok?'Saved v'+s.version:'Error');};};
+$('btnCopy').onclick=()=>{navigator.clipboard.writeText($('preview').textContent);};
+// files
+async function loadAssign(){const a=await api('/api/assignments');$('fAssign').innerHTML=a.map(x=>`<option>${x.key}</option>`).join('');
+$('fAssign').onchange=()=>{const cur=a.find(x=>x.key===$('fAssign').value);$('fFile').innerHTML=(cur?cur.files:[]).map(f=>`<option>${f}</option>`).join('');loadPdf();};
+$('fAssign').dispatchEvent(new Event('change'));}
+function fitCanvas(){const w=$('viewerWrap'),c=$('overlay');c.width=w.clientWidth;c.height=w.clientHeight;redraw();}
+function loadPdf(){const k=$('fAssign').value,f=$('fFile').value;if(!f)return;$('pdfEmbed').src=`/homework/${encodeURIComponent(k)}/normalized/${encodeURIComponent(f)}`;setTimeout(fitCanvas,300);}
+$('fFile').onchange=loadPdf;window.onresize=fitCanvas;loadAssign();
+// annotation
+let tool='pen',strokes=[],cur=null;
+const cv=$('overlay'),ctx=cv.getContext('2d');
+function redraw(){ctx.clearRect(0,0,cv.width,cv.height);for(const s of strokes){ctx.globalAlpha=s.tool==='hl'?0.35:1;ctx.strokeStyle=s.tool==='eraser'?'#999':(s.tool==='hl'?'#ff0':'#f00');ctx.lineWidth=s.tool==='hl'?14:(s.w||2);ctx.lineCap='round';ctx.beginPath();s.pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();}ctx.globalAlpha=1;}
+function pos(e){const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*(cv.width/r.width),(e.clientY-r.top)*(cv.height/r.height)];}
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);cur={tool,pts:[pos(e)],w:e.pressure?2+6*e.pressure:2};strokes.push(cur);redraw();});
+cv.addEventListener('pointermove',e=>{if(cur){cur.pts.push(pos(e));redraw();}});
+cv.addEventListener('pointerup',()=>cur=null);
+document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>tool=b.dataset.tool);
+$('btnUndo').onclick=()=>{strokes.pop();redraw();};
+$('btnClear').onclick=()=>{strokes=[];redraw();};
+$('btnSaveMarks').onclick=async()=>{const j=await api('/api/annotate/save','POST',{assignmentKey:$('fAssign').value,file:$('fFile').value,dataUrl:cv.toDataURL('image/png'),strokes});alert(j.ok?'Marks saved to marked/':'Error');};
+// roster
+async function loadRoster(){const s=await api('/api/students');$('rosterBody').innerHTML=s.map((r,i)=>`<tr><td><input data-i="${i}" data-k="id" value="${r.id||''}"></td><td><input data-i="${i}" data-k="officialName" value="${r.officialName||''}"></td><td><input data-i="${i}" data-k="arabicFirst" value="${r.arabicFirst||''}"></td><td><select data-i="${i}" data-k="gender"><option value="m" ${r.gender!=='f'?'selected':''}>m</option><option value="f" ${r.gender==='f'?'selected':''}>f</option></select></td><td><input data-i="${i}" data-k="classroomId" value="${r.classroomId||''}"></td><td><input data-i="${i}" data-k="variants" value="${(r.variants||[]).join(', ')}"></td><td><input type="checkbox" data-i="${i}" data-k="active" ${r.active===false?'':'checked'}></td><td><input type="checkbox" data-i="${i}" data-k="onClassroom" ${r.onClassroom===false?'':'checked'}></td></tr>`).join('');}
+$('btnLoadRoster').onclick=loadRoster;
+$('btnAddRow').onclick=()=>{$('rosterBody').insertAdjacentHTML('beforeend','<tr><td><input data-k="id"></td><td><input data-k="officialName"></td><td><input data-k="arabicFirst"></td><td><select data-k="gender"><option value="m">m</option><option value="f">f</option></select></td><td><input data-k="classroomId"></td><td><input data-k="variants"></td><td><input type="checkbox" data-k="active" checked></td><td><input type="checkbox" data-k="onClassroom" checked></td></tr>');};
+$('btnSaveRoster').onclick=async()=>{const rows=[...$('rosterBody').querySelectorAll('tr')];const students=rows.map(tr=>{const g=k=>tr.querySelector(`[data-k="${k}"]`);return{id:g('id').value.trim(),officialName:g('officialName').value.trim(),arabicFirst:g('arabicFirst').value.trim(),gender:g('gender').value,classroomId:g('classroomId').value.trim(),variants:g('variants').value.split(',').map(s=>s.trim()).filter(Boolean),active:g('active').checked,onClassroom:g('onClassroom').checked};});
+const j=await api('/api/students','POST',{students});alert(j.ok?'Saved '+j.count:'Error');};
+loadRoster();
+// missing
+async function loadMissingTab(){const a=await api('/api/assignments');const s=await api('/api/students');
+$('mAssign').innerHTML=a.map(x=>`<option>${x.key}</option>`).join('');
+const act=s.filter(x=>x.active!==false);
+$('mList').innerHTML=act.map(x=>`<label style="font-weight:normal"><input type="checkbox" data-sid="${x.id}" checked> ${x.officialName}</label>`).join('');
+loadMissingAll();}
+$('btnComputeMissing').onclick=async()=>{const checked=[...document.querySelectorAll('#mList input:checked')].map(c=>c.dataset.sid);
+const j=await api('/api/missing/compute','POST',{assignmentKey:$('mAssign').value,submittedIds:checked});
+alert(j.ok?('Missing: '+(j.missing.join(', ')||'none')):'Error');loadMissingAll();};
+async function loadMissingAll(){const j=await api('/api/missing');
+const cur=j.byAssignment[$('mAssign').value]||[];
+$('mMissing').innerHTML='<b>Missing for '+$('mAssign').value+':</b> '+(cur.join(', ')||'none 🎉');
+$('mGrouped').innerHTML=j.byStudent.map(g=>`<div class="card"><b>${g.officialName}</b> <small>(${g.assignments.join(', ')})</small><pre>${g.message}</pre><button class="ghost" onclick="navigator.clipboard.writeText(${JSON.stringify(g.message).replace(/</g,'\\u003c')})">Copy</button></div>`).join('')||'<small>No missing 🎉</small>';}
+$('btnLoadMissing').onclick=loadMissingAll;
+$('mAssign').onchange=loadMissingAll;
+loadMissingTab();
+// batch
+let batchPayload=null;
+$('btnBatchPreview').onclick=async()=>{const j=await api('/api/batch/preview','POST',{text:$('bText').value,dates:$('bDates').value,year:$('bYear').value});
+if(!j.ok){$('bOut').textContent='Error: '+j.error;return;}
+$('bOut').textContent=j.output;batchPayload=j.payload;$('btnBatchApprove').disabled=false;
+$('bReview').style.display=j.needsReview.length?'block':'none';
+$('bReview').textContent=j.needsReview.length?('Needs Review: '+j.needsReview.join(', ')):'';};
+$('btnBatchApprove').onclick=async()=>{if(!batchPayload)return;const j=await api('/api/batch/approve','POST',{payload:batchPayload});alert(j.ok?('Saved: '+j.assignments.join(', ')):'Error');};
+$('btnBatchCopy').onclick=()=>{navigator.clipboard.writeText($('bOut').textContent);};
+</script>
+</body></html>

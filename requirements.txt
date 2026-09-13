@@ -1,0 +1,3 @@
+Pillow>=10
+google-api-python-client>=2
+google-auth-oauthlib>=1

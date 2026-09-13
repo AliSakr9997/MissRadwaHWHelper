@@ -1,0 +1,22 @@
+[
+  {
+    "id": "sara-ali",
+    "officialName": "Sara Ali",
+    "arabicFirst": "سارة",
+    "gender": "f",
+    "classroomId": "",
+    "variants": ["Sara"],
+    "active": true,
+    "onClassroom": true
+  },
+  {
+    "id": "omar-khaled",
+    "officialName": "Omar Khaled",
+    "arabicFirst": "عمر",
+    "gender": "m",
+    "classroomId": "",
+    "variants": ["Omar"],
+    "active": true,
+    "onClassroom": true
+  }
+]
