@@ -51,6 +51,38 @@ def list_submissions(creds, course_id: str, coursework_id: str) -> list[dict]:
                      fields="studentSubmissions(id,userId,state,late,assignedGrade),nextPageToken")
 
 
+def _try(label: str, fn) -> dict:
+    """Run one read-only probe, never raise — returns {label, ok, count|error}."""
+    try:
+        items = fn()
+        sample = [{"id": c.get("id"), "name": c.get("name", c.get("title", "")),
+                   "state": c.get("courseState", c.get("state", ""))}
+                  for c in items[:10]]
+        return {"label": label, "ok": True, "count": len(items), "sample": sample}
+    except Exception as e:  # surface API errors verbatim (403/404/401...)
+        return {"label": label, "ok": False, "error": str(e)[:300]}
+
+
+def diagnose(creds, course_id: str | None = None) -> dict:
+    """Probe what this account can see. Read-only, changes nothing."""
+    svc = _service("classroom", "v1", creds)
+    probes = [
+        _try("courses as teacher (ACTIVE)",
+             lambda: _paginate(svc.courses().list, teacherId="me",
+                               courseStates=["ACTIVE"], pageSize=100)),
+        _try("courses as teacher (any state)",
+             lambda: _paginate(svc.courses().list, teacherId="me", pageSize=100)),
+        _try("courses as student",
+             lambda: _paginate(svc.courses().list, studentId="me", pageSize=100)),
+        _try("courses unfiltered",
+             lambda: _paginate(svc.courses().list, pageSize=30)),
+    ]
+    if course_id:
+        probes.append(_try(f"coursework in {course_id}",
+                           lambda: list_coursework(creds, course_id)))
+    return {"probes": probes}
+
+
 def classify(sub: dict) -> str:
     """Map Classroom state -> our model: submitted | missing."""
     state = sub.get("state", "")

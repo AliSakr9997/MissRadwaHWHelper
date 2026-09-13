@@ -120,8 +120,24 @@ def cmd_classroom(args: argparse.Namespace) -> int:
         return 0
     creds = classroom_auth.get_credentials()
     if args.action == "courses":
-        for c in classroom.list_courses(creds):
+        courses = classroom.list_courses(creds)
+        if not courses:
+            print("no ACTIVE courses where you are teacher. "
+                  "Run `classroom diagnose` to see what this account can access.")
+            return 0
+        for c in courses:
             print(f"{c['id']}  {c.get('name', '')}  [{c.get('courseState', '')}]")
+        return 0
+    if args.action == "diagnose":
+        import json as _json
+        d = classroom.diagnose(creds, args.course)
+        for p in d["probes"]:
+            if p["ok"]:
+                print(f"[ok] {p['label']}: {p['count']}")
+                for s in p["sample"]:
+                    print(f"     - {s['id']}  {s['name']}  [{s['state']}]")
+            else:
+                print(f"[ERROR] {p['label']}: {p['error']}")
         return 0
     if args.action == "summary":
         if not args.course:
@@ -174,7 +190,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--out", default=None, help="write output document to file")
     b.set_defaults(func=cmd_batch)
     c = sub.add_parser("classroom", help="Google Classroom read-only access")
-    c.add_argument("action", choices=["auth", "logout", "courses", "summary"])
+    c.add_argument("action", choices=["auth", "logout", "courses", "summary", "diagnose"])
     c.add_argument("--course", default=None, help="course id for summary")
     c.set_defaults(func=cmd_classroom)
     return p
