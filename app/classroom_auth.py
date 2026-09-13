@@ -64,10 +64,10 @@ def _auth_port() -> int:
 
 
 def _loopback_authorize(client_secret: str, scopes: list[str],
-                        open_browser: bool, timeout: int = 180) -> tuple[str, list[str]]:
+                        open_browser: bool, timeout: int = 180):
     """Run a loopback OAuth flow tolerant to Google substituting scopes.
 
-    Returns (authorization code, granted scopes, redirect uri).
+    Returns (flow, authorization code, granted scopes).
     Raises AuthError on denial/timeout.
     """
     import urllib.parse as _up
@@ -127,7 +127,7 @@ def _loopback_authorize(client_secret: str, scopes: list[str],
     if not code:
         raise AuthError("No authorization code arrived. Re-run auth and complete Allow.")
     granted = (q.get("scope") or [""])[0].split() or list(scopes)
-    return code, granted, f"http://127.0.0.1:{port}/"
+    return flow, code, granted
 
 
 def get_credentials(open_browser: bool = True):
@@ -154,16 +154,14 @@ def get_credentials(open_browser: bool = True):
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                code, granted, redirect_uri = _loopback_authorize(
+                flow, code, granted = _loopback_authorize(
                     str(CLIENT_SECRET_FILE), SCOPES, open_browser)
-                # Exchange with the GRANTED set: Google may substitute an
+                # Exchange on the SAME flow (it holds the PKCE verifier) but
+                # validate against the GRANTED set: Google may substitute an
                 # equivalent scope server-side (observed: coursework.students
-                # -> student-submissions.students). Exchanging with exactly
-                # what was granted always validates.
-                exchange = InstalledAppFlow.from_client_secrets_file(
-                    str(CLIENT_SECRET_FILE), granted)
-                exchange.redirect_uri = redirect_uri
-                creds = exchange.fetch_token(code=code)
+                # -> student-submissions.students).
+                flow.oauth2session.scope = granted
+                creds = flow.fetch_token(code=code)
                 import json as _json
                 scopes_path().write_text(_json.dumps(granted), encoding="utf-8")
         except AuthError:
