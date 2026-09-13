@@ -111,14 +111,18 @@ def cmd_batch(args: argparse.Namespace) -> int:
 
 def cmd_classroom(args: argparse.Namespace) -> int:
     from . import classroom, classroom_auth
-    if args.action == "auth":
-        classroom_auth.get_credentials()
-        print("authenticated — token saved locally (config/token.json, gitignored)")
-        return 0
-    if args.action == "logout":
-        print("logged out" if classroom_auth.logout() else "no local token")
-        return 0
-    creds = classroom_auth.get_credentials()
+    try:
+        if args.action == "auth":
+            classroom_auth.get_credentials()
+            print("authenticated — token saved in your profile folder (gitignored)")
+            return 0
+        if args.action == "logout":
+            print("logged out" if classroom_auth.logout() else "no local token")
+            return 0
+        creds = classroom_auth.get_credentials()
+    except Exception as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     if args.action == "courses":
         courses = classroom.list_courses(creds)
         if not courses:
@@ -154,6 +158,8 @@ def cmd_classroom(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="hwhelper", description="MissRadwaHWHelper offline CLI")
+    p.add_argument("--profile", default=None,
+                   help="teacher profile (isolated roster/token/homework, e.g. --profile sara)")
     sub = p.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("report", help="preview a HW report")
     r.add_argument("--student", default="")
@@ -202,6 +208,9 @@ def main(argv=None) -> int:
     except Exception:
         pass
     args = build_parser().parse_args(argv)
+    if getattr(args, "profile", None):
+        from . import profiles
+        profiles.set_current(args.profile)
     return args.func(args)
 
 

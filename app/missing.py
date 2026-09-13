@@ -80,7 +80,10 @@ def format_missing_list(day_label: str, official_names: list[str]) -> str:
 
 
 def load_missing_all(homework_dir: Path | None = None) -> dict[str, list[str]]:
-    hw = homework_dir or (BASE_DIR / "homework")
+    if homework_dir is None:
+        from . import profiles
+        homework_dir = profiles.homework_dir()
+    hw = homework_dir
     out: dict[str, list[str]] = {}
     if hw.exists():
         for base in sorted(p for p in hw.iterdir() if p.is_dir()):
@@ -104,7 +107,8 @@ def save_missing(assignment_key: str, missing_ids: list[str],
 
 def assignment_meta(assignment_key: str) -> dict:
     # Read-only: must NOT create folders as a side effect.
-    mf = BASE_DIR / "homework" / assignment_key / "meta.json"
+    from . import profiles
+    mf = profiles.homework_dir() / assignment_key / "meta.json"
     if mf.exists():
         try:
             return json.loads(mf.read_text(encoding="utf-8"))

@@ -1,28 +1,31 @@
-"""Roster helpers: local students.json wins. Simple load/save/resolve."""
+"""Roster helpers: per-teacher students.json wins. Simple load/save/resolve."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-STUDENTS_PATH = BASE_DIR / "config" / "students.json"
-EXAMPLE_PATH = BASE_DIR / "config" / "students.example.json"
+from . import profiles
 
 
 def load(path: Path | None = None) -> list[dict]:
-    p = path or STUDENTS_PATH
-    if not p.exists() and EXAMPLE_PATH.exists():
+    if path is None:
+        profiles.ensure_profile()
+        path = profiles.student_file()
+    if not path.exists() and profiles.EXAMPLE_ROSTER.exists():
         # First run: start from the (fictional) template. Real names are
         # added by the teacher via the Roster UI and never committed.
-        p.write_text(EXAMPLE_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-    if not p.exists():
+        path.write_text(profiles.EXAMPLE_ROSTER.read_text(encoding="utf-8"),
+                        encoding="utf-8")
+    if not path.exists():
         return []
-    return json.loads(p.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def save(students: list[dict], path: Path | None = None) -> None:
-    p = path or STUDENTS_PATH
-    p.write_text(json.dumps(students, ensure_ascii=False, indent=2), encoding="utf-8")
+    if path is None:
+        profiles.ensure_profile()
+        path = profiles.student_file()
+    path.write_text(json.dumps(students, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def active_only(students: list[dict]) -> list[dict]:

@@ -1,12 +1,14 @@
 __pycache__/
 *.pyc
 
-# --- Local-only: real student data must never commit ---
-# Teacher roster (real names live here after adding via Roster UI)
+# --- Local-only: real teacher/student data must never commit ---
+# Per-teacher profiles: rosters, tokens, homework runs (all local only)
+data/
+# Legacy paths (kept ignored for old checkouts)
 config/students.json
+config/token.json
+homework/*
+!homework/.gitkeep
 # Google OAuth client secret + tokens (never share, never commit)
 config/client_secret.json
 config/token.json
-# Homework runs: PDFs, reports, missing lists, markings (local only)
-homework/*
-!homework/.gitkeep

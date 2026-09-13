@@ -28,7 +28,7 @@ td,th{border:1px solid #ddd;padding:6px}
 </style>
 </head>
 <body>
-<header><b>MissRadwaHWHelper</b> — offline localhost &nbsp;<small>AI does admin · teacher does judgment</small></header>
+<header><b>MissRadwaHWHelper</b> — offline localhost &nbsp;<small>AI does admin · teacher does judgment</small> <small id="profileTag"></small></header>
 <div style="max-width:1100px;margin:auto;padding:8px">
 <nav>
 <button data-tab="reports" class="active">1 · Reports</button>
@@ -137,6 +137,7 @@ document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'))
 document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
 b.classList.add('active');$('tab-'+b.dataset.tab).classList.add('active');});
 async function api(p,m,b){const r=await fetch(p,{method:m||'GET',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});return r.json();}
+api('/api/profile').then(j=>{if(j.profile)$('profileTag').textContent='· profile: '+j.profile;}).catch(()=>{});
 // reports
 $('btnPreview').onclick=async()=>{
 const body={assignmentKey:$('rKey').value,student_query:$('rStudent').value,freeText:$('rFree').value||undefined,

@@ -52,7 +52,8 @@ def _read_json(handler: SimpleHTTPRequestHandler) -> dict:
 
 def _assignments() -> list[dict]:
     out = []
-    hw = BASE_DIR / "homework"
+    from . import profiles
+    hw = profiles.homework_dir()
     if not hw.exists():
         return out
     for base in sorted(p for p in hw.iterdir() if p.is_dir()):
@@ -104,9 +105,14 @@ class Handler(SimpleHTTPRequestHandler):
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
                 return
             _send_json(self, {"ok": True, "summary": summary})
+        elif parsed.path == "/api/profile":
+            from . import profiles
+            _send_json(self, {"profile": profiles.current()})
         elif parsed.path.startswith("/homework/"):
-            target = (BASE_DIR / parsed.path.lstrip("/")).resolve()
-            if not str(target).startswith(str(BASE_DIR)) or not target.is_file():
+            from . import profiles
+            hwroot = profiles.homework_dir().resolve()
+            target = (hwroot / parsed.path[len("/homework/"):]).resolve()
+            if not str(target).startswith(str(hwroot)) or not target.is_file():
                 self.send_error(404)
                 return
             ctype = "application/pdf" if target.suffix == ".pdf" else "application/octet-stream"

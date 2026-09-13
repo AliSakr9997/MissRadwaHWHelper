@@ -11,8 +11,14 @@ import re
 import shutil
 from pathlib import Path
 
+from . import profiles
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-HOMEWORK_DIR = BASE_DIR / "homework"
+
+
+def homework_root() -> Path:
+    profiles.ensure_profile()
+    return profiles.homework_dir()
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 HEIC_EXTS = {".heic", ".heif"}  # Pillow cannot read these -> flagged unsupported
@@ -28,7 +34,7 @@ def sanitize(name: str) -> str:
 
 
 def assignment_dirs(assignment_key: str) -> dict[str, Path]:
-    base = HOMEWORK_DIR / assignment_key
+    base = homework_root() / assignment_key
     paths = {
         "base": base,
         "original": base / "original",

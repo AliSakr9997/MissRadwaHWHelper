@@ -24,8 +24,10 @@ def load_rules(path: Path | None = None) -> dict:
 
 
 def load_students(path: Path | None = None) -> list[dict]:
-    p = path or (CONFIG_DIR / "students.json")
-    return json.loads(p.read_text(encoding="utf-8"))
+    if path is None:
+        from . import roster
+        return roster.load()
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def resolve_student(query: str, students: list[dict]) -> tuple[dict | None, bool]:

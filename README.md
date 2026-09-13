@@ -70,3 +70,24 @@ python -m app.main classroom auth
 python -m app.main classroom courses
 python -m app.main classroom summary --course COURSE_ID
 ```
+
+If sign-in fails with a permissions/scope message: revoke the app at
+myaccount.google.com → Security → Third-party access, run
+`python -m app.main classroom logout`, then `auth` again keeping ALL
+permission checkboxes ticked.
+
+## Second teacher (same or another machine)
+
+Each teacher gets an isolated profile (own roster, token, homework):
+
+```powershell
+python -m app.main --profile sara classroom auth   # her Google account
+HW_PROFILE=sara python -m app.server               # her workspace
+```
+
+- Same OAuth client works for everyone: in Cloud Console add each teacher
+  as a **Test User** (Testing mode, up to 100). They'll see an "unverified
+  app" screen once and click through.
+- Beyond that (whole school), Google requires **verification** of the app
+  for these sensitive scopes — a console paperwork process, not a code change.
+- One machine per teacher needs no profiles at all — just install and use.
