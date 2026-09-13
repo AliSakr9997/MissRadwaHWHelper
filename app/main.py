@@ -113,7 +113,8 @@ def cmd_classroom(args: argparse.Namespace) -> int:
     from . import classroom, classroom_auth
     try:
         if args.action == "auth":
-            classroom_auth.get_credentials()
+            classroom_auth.get_credentials(
+                open_browser=not getattr(args, "no_browser", False))
             print("authenticated — token saved in your profile folder (gitignored)")
             return 0
         if args.action == "logout":
@@ -121,6 +122,16 @@ def cmd_classroom(args: argparse.Namespace) -> int:
             return 0
         creds = classroom_auth.get_credentials()
     except Exception as e:
+        import traceback as _tb
+        from . import profiles as _prof
+        try:
+            log = _prof.data_dir() / "auth-debug.log"
+            log.parent.mkdir(parents=True, exist_ok=True)
+            log.write_text(_tb.format_exc(), encoding="utf-8")
+            print(f"(full traceback saved to {log} — never share it, it may "
+                  f"contain secrets)", file=sys.stderr)
+        except Exception:
+            pass
         print(f"error: {e}", file=sys.stderr)
         return 2
     if args.action == "courses":
@@ -198,6 +209,9 @@ def build_parser() -> argparse.ArgumentParser:
     c = sub.add_parser("classroom", help="Google Classroom read-only access")
     c.add_argument("action", choices=["auth", "logout", "courses", "summary", "diagnose"])
     c.add_argument("--course", default=None, help="course id for summary")
+    c.add_argument("--no-browser", action="store_true",
+                   help="print the Google URL instead of auto-opening a browser "
+                        "(use when your default browser is the wrong Google account)")
     c.set_defaults(func=cmd_classroom)
     return p
 

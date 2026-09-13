@@ -36,10 +36,12 @@ def token_path() -> Path:
     return profiles.token_file()
 
 
-def get_credentials():
+def get_credentials(open_browser: bool = True):
     """Return valid Credentials, running the localhost OAuth flow if needed.
 
     Raises AuthError with fix instructions instead of raw oauthlib tracebacks.
+    With open_browser=False the URL is printed for manual use (right browser
+    profile) instead of auto-opening the default browser.
     """
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
@@ -59,7 +61,7 @@ def get_credentials():
                 creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET_FILE), SCOPES)
-                creds = flow.run_local_server(port=0, open_browser=True)
+                creds = flow.run_local_server(port=0, open_browser=open_browser)
         except Exception as e:
             msg = str(e)
             if "scope" in msg.lower():
@@ -67,8 +69,8 @@ def get_credentials():
                     "Google granted different permissions than requested (stale grant "
                     "or an unticked checkbox on the consent screen).\n"
                     "Fix: myaccount.google.com → Security → Third-party access → "
-                    "remove this app → run `classroom auth` again and keep ALL "
-                    "permission checkboxes ticked.") from e
+                    "remove this app → run `classroom logout` → `classroom auth` again "
+                    "and keep ALL permission checkboxes ticked.") from e
             raise AuthError(f"Google sign-in failed: {msg}") from e
         token_file.write_text(creds.to_json(), encoding="utf-8")
     return creds
