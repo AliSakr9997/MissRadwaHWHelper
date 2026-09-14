@@ -296,8 +296,9 @@ class Handler(SimpleHTTPRequestHandler):
             dates = [d.strip() for d in str(data.get("dates", "")).split(",") if d.strip()]
             try:
                 sections = report_engine.parse_batch(data.get("text", ""), students)
-                payload = batch.resolve_batch(sections, dates, students,
-                                              year=data.get("year", "Y8"))
+                payload = batch.resolve_batch(
+                    sections, dates, students, year=data.get("year", "Y8"),
+                    rules=_report_rules())
             except ValueError as e:
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
                 return
@@ -355,7 +356,16 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 creds = classroom_auth.get_credentials()
                 selected = data.get("userIds")
-                user_ids = set(str(x) for x in selected) if selected else None
+                if selected is None:
+                    user_ids = None
+                else:
+                    by_local_id = {str(s.get("id")): s for s in roster.load()}
+                    user_ids = {
+                        str(by_local_id[str(item)].get("classroomId"))
+                        for item in selected
+                        if str(item) in by_local_id
+                        and by_local_id[str(item)].get("classroomId")
+                    }
                 manifest = classroom.download_assignment(
                     creds, str(data["courseId"]), str(data["courseworkId"]),
                     str(data["assignmentKey"]), user_ids=user_ids)
@@ -419,9 +429,9 @@ class Handler(SimpleHTTPRequestHandler):
                     data.get("text", ""), provider, model, key,
                     cfg.get("base_url", ""), roster=students,
                     year=data.get("year", "Y8"), default_dates=dates)
-                payload = ai_reports.to_batch_payload(raw, students,
-                                                      year=data.get("year", "Y8"),
-                                                      default_dates=dates)
+                payload = ai_reports.to_batch_payload(
+                    raw, students, year=data.get("year", "Y8"),
+                    default_dates=dates, rules=_report_rules())
             except Exception as e:
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
                 return
