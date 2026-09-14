@@ -95,12 +95,20 @@ def _assignments() -> list[dict]:
     for base in sorted(p for p in hw.iterdir() if p.is_dir()):
         norm = base / "normalized"
         files = sorted([p.name for p in norm.glob("*.pdf")]) if norm.exists() else []
+        data_dir = base / "data"
+        data_dir.mkdir(exist_ok=True)
         for stub in ("reports.json", "missing.json"):
-            f = base / stub
-            if not f.exists():
-                f.write_text("[]", encoding="utf-8")
-        reports = json.loads((base / "reports.json").read_text(encoding="utf-8"))
-        missing = json.loads((base / "missing.json").read_text(encoding="utf-8"))
+            old = base / stub
+            new = data_dir / stub
+            if not new.exists():
+                if old.exists():
+                    old.rename(new)
+                else:
+                    new.write_text("[]", encoding="utf-8")
+            elif old.exists() and old != new:
+                old.unlink(missing_ok=True)
+        reports = json.loads((data_dir / "reports.json").read_text(encoding="utf-8"))
+        missing = json.loads((data_dir / "missing.json").read_text(encoding="utf-8"))
         meta = {}
         mf = base / "meta.json"
         if mf.exists():
@@ -164,6 +172,10 @@ class Handler(SimpleHTTPRequestHandler):
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
                 return
             _send_json(self, {"ok": True, "courses": courses})
+        elif parsed.path == "/api/classroom/auth-status":
+            from . import classroom_auth
+            status = classroom_auth.check_auth_status()
+            _send_json(self, status)
         elif parsed.path == "/api/classroom/work":
             from . import classroom, classroom_auth, profiles
             course = (parse_qs(parsed.query).get("courseId") or [None])[0]
@@ -213,6 +225,15 @@ class Handler(SimpleHTTPRequestHandler):
                                 email_file.write_text(email, encoding="utf-8")
                 except (OSError, ValueError, TypeError, json.JSONDecodeError):
                         pass
+            if not email:
+                token_file = profiles.token_file()
+                if token_file.exists():
+                    try:
+                        token = json.loads(token_file.read_text(encoding="utf-8"))
+                        if token.get("token") or token.get("refresh_token"):
+                            email = "(signed in)"
+                    except (OSError, ValueError, TypeError):
+                        pass
             _send_json(self, {"profile": profiles.current(), "account": email,
                               "downloadPath": str(profiles.homework_dir())})
         elif parsed.path == "/api/preferences":
@@ -240,6 +261,29 @@ class Handler(SimpleHTTPRequestHandler):
                       for p, cls in ai_providers.PROVIDERS.items()}
             _send_json(self, {"ok": True, "config": cfg,
                               "providers": sorted(models), "models": models})
+        elif parsed.path == "/api/ai/google-models":
+            from . import ai_config, ai_providers
+            cfg = ai_config.load()
+            key = cfg.get("api_key", "")
+            defaults = ai_providers.GoogleProvider.FALLBACK_MODELS
+            if not key or cfg.get("provider") != "google":
+                _send_json(self, {"ok": True, "models": defaults,
+                                  "source": "defaults"})
+                return
+            try:
+                prov = ai_providers.GoogleProvider(key)
+                models = prov.list_models()
+                # Merge: if user has a saved model not in the API response, add it
+                saved_model = cfg.get("model", "")
+                api_ids = {m["id"] for m in models}
+                if saved_model and saved_model not in api_ids:
+                    models.insert(0, {"id": saved_model,
+                                      "name": saved_model + " (saved)",
+                                      "free": False})
+                _send_json(self, {"ok": True, "models": models, "source": "api"})
+            except Exception as e:
+                _send_json(self, {"ok": True, "models": defaults,
+                                  "source": "fallback", "error": str(e)})
         elif parsed.path.startswith("/homework/"):
             from . import profiles
             hwroot = profiles.homework_dir().resolve()
@@ -258,6 +302,17 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/classroom/logout":
             from . import classroom_auth
             _send_json(self, {"ok": classroom_auth.logout()})
+            return
+        if parsed.path == "/api/classroom/auth-url":
+            from . import classroom_auth
+            if not classroom_auth.is_configured():
+                _send_json(self, {"ok": False, "error": "OAuth client not configured"}, 400)
+                return
+            try:
+                url = classroom_auth.start_auth_background()
+                _send_json(self, {"ok": True, "url": url})
+            except Exception as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
             return
         if parsed.path == "/api/shutdown":
             _send_json(self, {"ok": True})
@@ -395,8 +450,8 @@ class Handler(SimpleHTTPRequestHandler):
         elif parsed.path == "/api/report/approve":
             data = _read_json(self)
             key = data.get("assignmentKey", "2026-09-05_example_assignment")
-            base = file_organizer.assignment_dirs(key)["base"]
-            rf = base / "reports.json"
+            dirs = file_organizer.assignment_dirs(key)
+            rf = dirs["data"] / "reports.json"
             reports = json.loads(rf.read_text(encoding="utf-8"))
             # version both: next version for this student+assignment
             sid = data.get("studentId") or data.get("officialName", "unknown")

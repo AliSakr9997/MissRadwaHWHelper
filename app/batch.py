@@ -122,10 +122,11 @@ def save_payload(payload: dict) -> None:
     import json
     from . import file_organizer
     for d in payload["days"]:
-        base = file_organizer.assignment_dirs(d["key"])["base"]
+        dirs = file_organizer.assignment_dirs(d["key"])
+        base = dirs["base"]
         (base / "meta.json").write_text(json.dumps({"date": d["iso_date"]}, ensure_ascii=False),
                                         encoding="utf-8")
-        rf = base / "reports.json"
+        rf = dirs["data"] / "reports.json"
         try:
             reports = json.loads(rf.read_text(encoding="utf-8"))
         except Exception:

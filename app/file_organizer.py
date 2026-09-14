@@ -36,8 +36,10 @@ def sanitize(name: str) -> str:
 
 def assignment_dirs(assignment_key: str) -> dict[str, Path]:
     base = homework_root() / assignment_key
+    data = base / "data"
     paths = {
         "base": base,
+        "data": data,
         "original": base / "original",
         "normalized": base / "normalized",
         "marked": base / "marked",
@@ -45,9 +47,16 @@ def assignment_dirs(assignment_key: str) -> dict[str, Path]:
     for p in paths.values():
         p.mkdir(parents=True, exist_ok=True)
     for stub in ("reports.json", "missing.json"):
-        f = base / stub
-        if not f.exists():
-            f.write_text("[]", encoding="utf-8")
+        # Migrate old flat location into data/ if data/ is empty
+        old = base / stub
+        new = data / stub
+        if not new.exists():
+            if old.exists():
+                old.rename(new)
+            else:
+                new.write_text("[]", encoding="utf-8")
+        elif old.exists() and old != new:
+            old.unlink(missing_ok=True)
     links = base / "links.txt"
     if not links.exists():
         links.write_text("# link-only submissions, one URL per line\n", encoding="utf-8")

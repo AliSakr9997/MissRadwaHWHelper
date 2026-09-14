@@ -53,6 +53,11 @@ button.primary:active,button.ghost:active{transform:translate(2px,2px);box-shado
 .toolbar.bottom-toolbar{margin-top:18px}
 .mark-help{display:block;font-size:1rem;line-height:1.55;margin:18px 0}
 .preset{min-width:86px}
+.preset-row{display:inline-flex;align-items:center;gap:6px;margin:0 10px 0 0;padding:4px 0}
+.preset-row label{margin:0;display:inline-flex;align-items:center;gap:3px}
+.preset-color{width:28px;height:28px;padding:0;border:2px solid var(--ink);cursor:pointer}
+.preset-size{width:48px;padding:3px;border:2px solid var(--ink);font-size:.8rem;text-align:center}
+.color-btn{min-width:60px!important;font-size:.75rem!important;padding:6px 10px!important}
 .copy-box{font-size:1rem;line-height:1.6;white-space:pre-wrap}
 .cwStudent,#mList input{width:20px;height:20px;vertical-align:middle}
 #mChecks small{display:block;font-size:1.1rem;line-height:1.55;margin-bottom:12px}
@@ -139,7 +144,7 @@ small{line-height:1.45}
 <hr>
 <label>Paste (day sections separated by <code>-----</code> / <code>Monday HW</code> lines)</label>
 <textarea id="bText" rows="10" placeholder="Sara Ali&#10;Didn't send hw&#10;&#10;Omar Khaled&#10;46/54&#10;..."></textarea>
-<div class="row"><div><label>Dates per day section (comma ISO)</label><input id="bDates" value="2026-09-05,2026-09-07"><input id="bDatePicker" type="date"><button class="ghost" id="btnAddBatchDate">Add date</button></div>
+<div class="row"><div><label>Add dates (one per day section)</label><input type="hidden" id="bDates" value="2026-09-05,2026-09-07"><input id="bDatePicker" type="date"> <button class="ghost" id="btnAddBatchDate">+ Add date</button> <small id="bDatesList">2026-09-05, 2026-09-07</small></div>
 <div><label>Class</label><input id="bYear" value="Y8"></div></div>
 <p><button class="primary" id="btnBatchPreview">Preview all</button>
 <button class="ghost" id="btnBatchApprove" disabled>Approve all &amp; save</button>
@@ -155,7 +160,10 @@ small{line-height:1.45}
 <h3>AI provider (your own key, stored only on this machine)</h3>
 <p><small><b>How to use:</b> choose a provider, create an API key in that provider's developer dashboard, paste it below, choose the model, click Save config, then Test connection. Use OpenAI-compatible providers for hosted APIs; use Custom with a local URL for LM Studio or another compatible server. The key stays encrypted in this teacher profile and is never displayed in full. AI is optional; Page 02 works without it.</small></p>
 <div class="row"><div><label>Provider</label><select id="aProv"></select></div>
-<div><label>Model</label><input id="aModel" list="aModelList" placeholder="e.g. gpt-4o-mini"><datalist id="aModelList"></datalist></div></div>
+<div><label>Model</label>
+<div id="modelGoogleWrap" style="display:none"><select id="aModelGoogle"></select> <button class="ghost" id="btnRefreshModels" style="display:inline-block;padding:6px 10px;font-size:.7rem">↻ Refresh</button></div>
+<div id="modelDefaultWrap"><input id="aModel" list="aModelList" placeholder="e.g. gpt-4o-mini"><datalist id="aModelList"></datalist></div>
+</div></div>
 <label>API key</label><input id="aKey" type="password" placeholder="never shown back, only ····last4">
 <label>Base URL (custom provider only)</label><input id="aUrl" placeholder="http://localhost:1234/v1">
 <p><button class="primary" id="btnAiSave">Save config</button>
@@ -174,7 +182,7 @@ small{line-height:1.45}
 <h3>Free-form log → AI → validated reports</h3>
 <small>Write naturally — no rigid syntax. Numbers/names are validated by the app; anything unclear becomes Needs Review.</small>
 <label>Paste</label><textarea id="aText" rows="8" placeholder="Sara did 46 out of 54, 8 mistakes, very good..."></textarea>
-<div class="row"><div><label>Dates per day section (comma ISO)</label><input id="aDates" value="2026-09-05"><input id="aDatePicker" type="date"><button class="ghost" id="btnAddAiDate">Add date</button></div>
+<div class="row"><div><label>Add dates (one per day section)</label><input type="hidden" id="aDates" value="2026-09-05"><input id="aDatePicker" type="date"> <button class="ghost" id="btnAddAiDate">+ Add date</button> <small id="aDatesList">2026-09-05</small></div>
 <div><label>Class</label><input id="aYear" value="Y8"></div></div>
 <p><button class="primary" id="btnAiPreview">Preview all</button>
 <button class="ghost" id="btnAiApprove" disabled>Approve all &amp; save</button>
@@ -206,21 +214,36 @@ small{line-height:1.45}
 <button class="ghost" id="btnUndo">↩️ Undo</button>
 <button class="ghost" id="btnRedo">↪️ Redo</button>
 <button class="ghost" id="btnClear">🗑️ Clear</button>
-<button class="primary" id="btnSaveMarks">💾 Save marks</button>
 </div>
-<div class="toolbar bottom-toolbar">
-<button class="primary" id="btnSaveMarksBottom">💾 Save marks</button>
-<button class="ghost preset" data-preset="red">Red · 3</button>
-<button class="ghost preset" data-preset="blue">Blue · 5</button>
-<button class="ghost preset" data-preset="black">Black · 7</button>
+<div id="viewerWrap"><embed id="pdfEmbed"><canvas id="overlay"></canvas></div>
+<div class="editor-controls">
+<label>Opacity <input id="markOpacity" type="range" min="10" max="100" value="100"></label>
 </div>
+<div style="margin-top:14px">
+<label>Preset strokes</label>
+<div class="toolbar" style="margin:6px 0">
+<div class="preset-row"><label><small>Red</small> <input type="color" id="presetRedColor" value="#d02020" class="preset-color"></label> <label><small>Size</small> <input type="number" id="presetRedSize" value="3" min="1" max="32" class="preset-size"></label> <button class="ghost preset" data-preset="red">Red</button></div>
+<div class="preset-row"><label><small>Blue</small> <input type="color" id="presetBlueColor" value="#1040c0" class="preset-color"></label> <label><small>Size</small> <input type="number" id="presetBlueSize" value="5" min="1" max="32" class="preset-size"></label> <button class="ghost preset" data-preset="blue">Blue</button></div>
+<div class="preset-row"><label><small>Black</small> <input type="color" id="presetBlackColor" value="#121212" class="preset-color"></label> <label><small>Size</small> <input type="number" id="presetBlackSize" value="7" min="1" max="32" class="preset-size"></label> <button class="ghost preset" data-preset="black">Black</button></div>
+</div>
+<label>Quick colors</label>
+<div class="toolbar" style="margin:6px 0">
+<button class="ghost color-btn" data-color="#d02020" style="background:#d02020;color:#fff">Red</button>
+<button class="ghost color-btn" data-color="#1040c0" style="background:#1040c0;color:#fff">Blue</button>
+<button class="ghost color-btn" data-color="#121212" style="background:#121212;color:#fff">Black</button>
+<button class="ghost color-btn" data-color="#008000" style="background:#008000;color:#fff">Green</button>
+<button class="ghost color-btn" data-color="#ff6600" style="background:#ff6600;color:#fff">Orange</button>
+<button class="ghost color-btn" data-color="#800080" style="background:#800080;color:#fff">Purple</button>
+<button class="ghost color-btn" data-color="#00aaff" style="background:#00aaff;color:#fff">Sky</button>
+<button class="ghost color-btn" data-color="#cc0066" style="background:#cc0066;color:#fff">Pink</button>
+</div>
+<label>Custom color + size</label>
 <div class="editor-controls">
 <label>Color <input id="markColor" type="color" value="#d02020"></label>
 <label>Size <input id="markSize" type="range" min="1" max="32" value="3"></label>
-<label>Opacity <input id="markOpacity" type="range" min="10" max="100" value="100"></label>
 </div>
-<div id="viewerWrap"><embed id="pdfEmbed"><canvas id="overlay"></canvas></div>
-<small class="mark-help">Choose a mark tool first. The PDF itself remains clickable until a drawing tool is selected, so browser controls and page borders are not captured by the canvas. The three presets pair a primary color with a stroke/font size. Text, shapes, colors, opacity, undo/redo, and overlays are saved next to the PDF in <code>marked/</code>.</small>
+<p><button class="primary" id="btnSaveMarks">💾 Save marks</button></p>
+<small class="mark-help">Choose a mark tool first. Click a quick color or preset to set stroke color. Presets pair a color with a stroke/font size. Text, shapes, colors, opacity, undo/redo, and overlays are saved next to the PDF in <code>marked/</code>.</small>
 </div>
 </section>
 
@@ -274,6 +297,64 @@ small{line-height:1.45}
 <p><small>Local assignment key is the safe folder identifier. Assignment name is the readable label used for organized filenames. The download folder controls the parent location for these local files; Google Classroom itself is not changed.</small></p>
 <div id="settingsStatus" class="warn" style="margin-top:18px">Your data stays in this local teacher profile.</div>
 </div>
+<div class="card">
+<h3>Report examples</h3>
+<p><small>See how teacher input turns into a formatted report.</small></p>
+<div class="row">
+<div>
+<label>Teacher input (individual)</label>
+<pre style="font-size:.85rem">Sara Ali
+46/54
+8 mistakes
+very good
+note: Study again the fraction flipping in dividing</pre>
+</div>
+<div>
+<label>Generated output</label>
+<pre style="font-size:.85rem">📝HW Report
+Sara Ali (Y8 5/9 Saturday)
+HW sent ontime ✅
+Mistakes (8) 🟢
+Skipped questions (none) 🟢
+Understanding (very good) 🟢
+Grade: 46/54
+
+‼️NOTE‼️
+Study again the fraction flipping in dividing.</pre>
+</div>
+</div>
+<div class="row" style="margin-top:18px">
+<div>
+<label>Teacher input (missing)</label>
+<pre style="font-size:.85rem">Omar Khaled
+didn't send hw</pre>
+</div>
+<div>
+<label>Generated output</label>
+<pre style="font-size:.85rem">📝HW Report
+Omar Khaled (Y8 5/9 Saturday)
+🔴 Did not send HW</pre>
+</div>
+</div>
+<div style="margin-top:18px">
+<label>Batch paste input (multiple students, day sections separated by -----)</label>
+<pre style="font-size:.85rem">Sara Ali
+46/54
+8 mistakes
+very good
+
+-----
+
+Omar Khaled
+didn't send hw
+
+Remas Salah
+39/54
+4 mistakes
+1 skipped
+good</pre>
+</div>
+</div>
 </section>
 </main>
 </div>
@@ -289,11 +370,26 @@ let closingApp=false;
 window.addEventListener('pagehide',()=>{if(closingApp)return;closingApp=true;navigator.sendBeacon('/api/shutdown','');});
 if($('aiConfigCard'))$('settingsPanel').appendChild($('aiConfigCard'));
 if($('templateCard'))$('settingsPanel').appendChild($('templateCard'));
-function addDateTo(inputId,pickerId){const value=$(pickerId).value;if(!value)return;const dates=$(inputId).value.split(',').map(x=>x.trim()).filter(Boolean);if(!dates.includes(value))dates.push(value);$(inputId).value=dates.join(',');}
-if($('btnAddBatchDate'))$('btnAddBatchDate').onclick=()=>addDateTo('bDates','bDatePicker');
-if($('btnAddAiDate'))$('btnAddAiDate').onclick=()=>addDateTo('aDates','aDatePicker');
+function addDateTo(inputId,pickerId,listId){const value=$(pickerId).value;if(!value)return;const dates=$(inputId).value.split(',').map(x=>x.trim()).filter(Boolean);if(!dates.includes(value))dates.push(value);$(inputId).value=dates.join(',');if($(listId))$(listId).textContent=dates.join(', ');}
+if($('btnAddBatchDate'))$('btnAddBatchDate').onclick=()=>{addDateTo('bDates','bDatePicker','bDatesList');$('bDatePicker').value='';};
+if($('btnAddAiDate'))$('btnAddAiDate').onclick=()=>{addDateTo('aDates','aDatePicker','aDatesList');$('aDatePicker').value='';};
 function setAccount(account){$('profileTag').textContent=account?'· '+account:'';$('settingsProfile').value=account||'Not signed in';}
 api('/api/profile').then(j=>{setAccount(j.account);$('downloadPath').value=j.downloadPath||'';}).catch(()=>setAccount(''));
+(async function checkExistingAuth(){
+  try{
+    const j=await api('/api/classroom/courses');
+    if(j.ok&&j.courses&&j.courses.length>0){
+      $('signinScreen').classList.add('hidden');
+      const profile=await api('/api/profile'); setAccount(profile.account);
+      $('cwStatus').textContent='Connected. Choose a class and assignment.';
+      await loadClassroomCourses();
+      await Promise.allSettled([loadAssign(),loadRoster(),loadMissingTab(),loadAiCfg(),loadTemplate()]);
+      return;
+    }
+  }catch(e){}
+  $('signinScreen').classList.remove('hidden');
+  await Promise.allSettled([loadAssign(),loadRoster(),loadMissingTab(),loadAiCfg(),loadTemplate()]);
+})();
 api('/api/classroom/setup').then(j=>{
   const el=$('signinSetup');
   if(!j.clientSecret){el.textContent='Setup needed: save your Desktop OAuth JSON as config/client_secret.json.';}
@@ -307,20 +403,17 @@ async function signIn(){
   $('btnSignIn').disabled=true;
   $('btnSignIn').textContent='Connecting...';
   try{
-    const j=await api('/api/classroom/courses?reauth=1');
-    if(!j.ok)throw new Error(j.error||'Google sign-in failed');
-    $('signinScreen').classList.add('hidden');
-    const profile=await api('/api/profile'); setAccount(profile.account);
-    $('cwStatus').textContent='Connected. Choose a class and assignment.';
-    await loadClassroomCourses();
-    await Promise.allSettled([loadAssign(),loadRoster(),loadMissingTab(),loadAiCfg(),loadTemplate()]);
+    const j=await api('/api/classroom/auth-url','POST',{});
+    if(!j.ok)throw new Error(j.error||'Could not start Google sign-in');
+    window.location.href=j.url;
   }catch(e){
     $('signinError').textContent=e.message+' If this mentions an API or permission problem, enable Google Classroom API and Google Drive API, add this teacher as an OAuth test user, then remove the local Google connection and try again.';
     $('signinError').style.display='block';
-  }finally{$('btnSignIn').disabled=false;$('btnSignIn').textContent='Sign in with Google';}
+    $('btnSignIn').disabled=false;$('btnSignIn').textContent='Sign in with Google';
+  }
 }
 $('btnSignIn').onclick=signIn;
-$('btnSettingsSignIn').onclick=async()=>{const j=await api('/api/classroom/logout','POST',{});$('signinScreen').classList.remove('hidden');$('settingsStatus').textContent=j.ok?'Signed out. Sign in again to switch Google account.':'No saved Google session; sign in to connect.';};
+$('btnSettingsSignIn').onclick=async()=>{const j=await api('/api/classroom/logout','POST',{});window.location.reload();};
 // reports
 $('btnPreview').onclick=async()=>{
 const body={assignmentKey:$('rKey').value,student_query:$('rStudent').value,freeText:$('rFree').value||undefined,
@@ -396,8 +489,13 @@ $('btnUndo').onclick=()=>{if(strokes.length){redoStack.push(strokes.pop());redra
 $('btnRedo').onclick=()=>{if(redoStack.length){strokes.push(redoStack.pop());redraw();}};
 $('btnClear').onclick=()=>{if(strokes.length){redoStack.push(...strokes);strokes=[];redraw();}};
 async function saveMarks(){const j=await api('/api/annotate/save','POST',{assignmentKey:$('fAssign').value,file:$('fFile').value,dataUrl:cv.toDataURL('image/png'),strokes});alert(j.ok?'Marks saved to marked/':'Error');}
-$('btnSaveMarks').onclick=saveMarks;$('btnSaveMarksBottom').onclick=saveMarks;
-document.querySelectorAll('.preset').forEach(b=>b.onclick=()=>{const p={red:['#d02020',3],blue:['#1040c0',5],black:['#121212',7]}[b.dataset.preset];$('markColor').value=p[0];$('markSize').value=p[1];});
+$('btnSaveMarks').onclick=saveMarks;
+document.querySelectorAll('.preset').forEach(b=>b.onclick=()=>{
+const p={red:{c:$('presetRedColor').value,s:+$('presetRedSize').value},
+blue:{c:$('presetBlueColor').value,s:+$('presetBlueSize').value},
+black:{c:$('presetBlackColor').value,s:+$('presetBlackSize').value}}[b.dataset.preset];
+if(p){$('markColor').value=p.c;$('markSize').value=p.s;}});
+document.querySelectorAll('.color-btn').forEach(b=>b.onclick=()=>{$('markColor').value=b.dataset.color;});
 // roster
 async function loadRoster(){const s=await api('/api/students');$('rosterBody').innerHTML=s.map((r,i)=>`<tr><td><input data-i="${i}" data-k="id" value="${r.id||''}"></td><td><input data-i="${i}" data-k="officialName" value="${r.officialName||''}"></td><td><input data-i="${i}" data-k="arabicFirst" value="${r.arabicFirst||''}"></td><td><select class="gender-select" data-i="${i}" data-k="gender"><option value="m" ${r.gender!=='f'?'selected':''}>Male (M)</option><option value="f" ${r.gender==='f'?'selected':''}>Female (F)</option></select></td><td><input data-i="${i}" data-k="classroomId" value="${r.classroomId||''}"></td><td><input data-i="${i}" data-k="variants" value="${(r.variants||[]).join(', ')}"></td><td><input type="checkbox" data-i="${i}" data-k="active" ${r.active===false?'':'checked'}></td><td><input type="checkbox" data-i="${i}" data-k="onClassroom" ${r.onClassroom===false?'':'checked'}></td></tr>`).join('');}
 $('btnLoadRoster').onclick=loadRoster;
@@ -444,17 +542,36 @@ $('bReview').textContent=j.needsReview.length?('Needs Review: '+j.needsReview.jo
 $('btnBatchApprove').onclick=async()=>{if(!batchPayload)return;const j=await api('/api/batch/approve','POST',{payload:batchPayload});alert(j.ok?('Saved: '+j.assignments.join(', ')):'Error');};
 $('btnBatchCopy').onclick=()=>{navigator.clipboard.writeText($('bOut').textContent);};
 // AI tab
-let aiModels={}, aiPayload=null;
+let aiModels={}, aiPayload=null, currentProvider='';
 async function loadAiCfg(){const j=await api('/api/ai/config');if(!j.ok)return;
 aiModels=j.models||{};$('aProv').innerHTML=j.providers.map(p=>`<option ${p===j.config.provider?'selected':''}>${p}</option>`).join('');
-fillModels();if(j.config.model)$('aModel').value=j.config.model;
+currentProvider=j.config.provider;
 if(j.config.base_url)$('aUrl').value=j.config.base_url;
-if(j.config.api_key_hint)$('aKey').placeholder='saved '+j.config.api_key_hint+' (leave blank to keep)';}
+if(j.config.api_key_hint)$('aKey').placeholder='saved '+j.config.api_key_hint+' (leave blank to keep)';
+await switchModelUI(j.config.provider, j.config.model);}
+async function switchModelUI(provider, savedModel){
+const isGoogle=provider==='google';
+$('modelGoogleWrap').style.display=isGoogle?'block':'none';
+$('modelDefaultWrap').style.display=isGoogle?'none':'block';
+if(isGoogle){await loadGoogleModels(savedModel);}else{fillModels();if(savedModel)$('aModel').value=savedModel;}}
+async function loadGoogleModels(savedModel){
+$('aModelGoogle').innerHTML='<option>Loading...</option>';
+try{const j=await api('/api/ai/google-models');
+if(!j.ok||!j.models||!j.models.length){$('aModelGoogle').innerHTML='<option>Error loading models</option>';return;}
+const free=j.models.filter(m=>m.free);const other=j.models.filter(m=>!m.free);
+let html='';
+if(free.length){html+='<optgroup label="FREE MODELS">';free.forEach(m=>{html+=`<option value="${m.id}">${m.name}</option>`;});html+='</optgroup>';}
+if(other.length){html+='<optgroup label="Other available models">';other.forEach(m=>{html+=`<option value="${m.id}">${m.name}</option>`;});html+='</optgroup>';}
+$('aModelGoogle').innerHTML=html;
+if(savedModel){if(![...$('aModelGoogle').options].some(o=>o.value===savedModel)){$('aModelGoogle').insertAdjacentHTML('afterbegin',`<option value="${savedModel}">${savedModel} (saved)</option>`);}$('aModelGoogle').value=savedModel;}
+}catch(e){$('aModelGoogle').innerHTML='<option>Error: '+e.message+'</option>';}}
 function fillModels(){const ms=aiModels[$('aProv').value]||[];$('aModelList').innerHTML=ms.map(m=>`<option value="${m}">`).join('');}
-$('aProv').onchange=fillModels;
-$('btnAiSave').onclick=async()=>{const j=await api('/api/ai/config','POST',{provider:$('aProv').value,model:$('aModel').value,api_key:$('aKey').value,base_url:$('aUrl').value});
+$('aProv').onchange=async()=>{currentProvider=$('aProv').value;await switchModelUI(currentProvider,'');};
+$('btnRefreshModels').onclick=async()=>{const saved=$('aModelGoogle').value;await loadGoogleModels(saved);};
+function getModelValue(){return currentProvider==='google'?$('aModelGoogle').value:$('aModel').value;}
+$('btnAiSave').onclick=async()=>{const j=await api('/api/ai/config','POST',{provider:$('aProv').value,model:getModelValue(),api_key:$('aKey').value,base_url:$('aUrl').value});
 $('aStatus').textContent=j.ok?'Saved.':'Error: '+j.error;};
-$('btnAiTest').onclick=async()=>{$('aStatus').textContent='Testing…';const j=await api('/api/ai/test','POST',{});$('aStatus').textContent=j.ok?('OK: '+j.message):('FAILED: '+j.message);};
+$('btnAiTest').onclick=async()=>{$('aStatus').textContent='Testing…';const j=await api('/api/ai/test','POST',{});$('aStatus').textContent=j.ok?('OK: '+j.message):('FAILED: '+(j.message||j.error||'unknown error'));};
 $('btnAiPreview').onclick=async()=>{const j=await api('/api/ai/preview','POST',{text:$('aText').value,dates:$('aDates').value,year:$('aYear').value});
 if(!j.ok){$('aOut').textContent='Error: '+j.error;return;}
 $('aOut').textContent=j.output;aiPayload=j.payload;$('btnAiApprove').disabled=false;

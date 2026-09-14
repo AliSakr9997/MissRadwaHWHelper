@@ -87,7 +87,8 @@ def load_missing_all(homework_dir: Path | None = None) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     if hw.exists():
         for base in sorted(p for p in hw.iterdir() if p.is_dir()):
-            mf = base / "missing.json"
+            data_dir = base / "data"
+            mf = data_dir / "missing.json" if data_dir.exists() else base / "missing.json"
             if mf.exists():
                 try:
                     out[base.name] = json.loads(mf.read_text(encoding="utf-8"))
@@ -99,8 +100,8 @@ def load_missing_all(homework_dir: Path | None = None) -> dict[str, list[str]]:
 def save_missing(assignment_key: str, missing_ids: list[str],
                  homework_dir: Path | None = None) -> Path:
     from . import file_organizer
-    base = file_organizer.assignment_dirs(assignment_key)["base"]
-    mf = base / "missing.json"
+    dirs = file_organizer.assignment_dirs(assignment_key)
+    mf = dirs["data"] / "missing.json"
     mf.write_text(json.dumps(missing_ids, ensure_ascii=False, indent=2), encoding="utf-8")
     return mf
 

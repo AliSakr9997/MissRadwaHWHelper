@@ -190,6 +190,26 @@ class AnthropicProvider(AIProvider):
 class GoogleProvider(AIProvider):
     name = "google"
 
+    FREE_MODELS = {
+        "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash",
+        "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
+        "gemini-3-flash-preview",
+        "gemma-4-31b-it", "gemma-4-26b-a4b-it",
+    }
+
+    EXCLUDED_MODELS = {"gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"}
+
+    FALLBACK_MODELS = [
+        {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash (Free)", "free": True},
+        {"id": "gemini-3.6-flash", "name": "Gemini 3.6 Flash (Free)", "free": True},
+        {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash (Free)", "free": True},
+        {"id": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash Lite (Free)", "free": True},
+        {"id": "gemini-3.1-flash-lite", "name": "Gemini 3.1 Flash Lite (Free)", "free": True},
+        {"id": "gemini-3-flash-preview", "name": "Gemini 3 Flash Preview (Free)", "free": True},
+        {"id": "gemma-4-31b-it", "name": "Gemma 4 31B IT (Free)", "free": True},
+        {"id": "gemma-4-26b-a4b-it", "name": "Gemma 4 26B A4B IT (Free)", "free": True},
+    ]
+
     def chat_json(self, system: str, user: str, model: str) -> dict:
         data = _post_json(
             f"https://generativelanguage.googleapis.com/v1beta/models/{model}"
@@ -204,9 +224,53 @@ class GoogleProvider(AIProvider):
             raise ProviderError(f"unexpected response shape: {str(data)[:200]}") from e
         return _extract_json(text)
 
+    def list_models(self) -> list[dict]:
+        """Fetch models from Google API, filter to generateContent-capable,
+        cross-reference against approved free list."""
+        url = (f"https://generativelanguage.googleapis.com/v1beta/models"
+               f"?key={self.api_key}")
+        try:
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            return list(self.FALLBACK_MODELS)
+
+        result = []
+        seen = set()
+        for m in data.get("models", []):
+            name = m.get("name", "")
+            if ":generateContent" not in m.get("supportedGenerationMethods", []):
+                continue
+            model_id = name.rsplit("/", 1)[-1] if "/" in name else name
+            if model_id in self.EXCLUDED_MODELS or model_id in seen:
+                continue
+            seen.add(model_id)
+            is_free = model_id in self.FREE_MODELS
+            display = model_id
+            if is_free:
+                friendly = {
+                    "gemini-3.8-flash": "Gemini 3.8 Flash",
+                    "gemini-3.6-flash": "Gemini 3.6 Flash",
+                    "gemini-3.5-flash": "Gemini 3.5 Flash",
+                    "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite",
+                    "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
+                    "gemini-3-flash-preview": "Gemini 3 Flash Preview",
+                    "gemma-4-31b-it": "Gemma 4 31B IT",
+                    "gemma-4-26b-a4b-it": "Gemma 4 26B A4B IT",
+                }.get(model_id, model_id)
+                display = f"{friendly} (Free)"
+            result.append({"id": model_id, "name": display, "free": is_free})
+
+        result.sort(key=lambda x: (not x["free"], x["id"]))
+        return result if result else list(self.FALLBACK_MODELS)
+
     @staticmethod
     def default_models() -> list[str]:
-        return ["gemini-1.5-flash", "gemini-1.5-pro"]
+        return ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash",
+                "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
+                "gemini-3-flash-preview",
+                "gemma-4-31b-it", "gemma-4-26b-a4b-it"]
 
 
 PROVIDERS: dict[str, type[AIProvider]] = {

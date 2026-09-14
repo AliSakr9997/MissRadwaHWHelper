@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 import re
 
@@ -93,6 +94,120 @@ def _auth_port() -> int:
         return 0
 
 
+_auth_state = {"url": None, "error": None, "done": False, "lock": threading.Lock()}
+
+
+def start_auth_background(timeout: int = 180) -> str:
+    """Start the OAuth loopback in a background thread, return the auth URL.
+
+    The thread waits for Google's callback, exchanges the code, and saves
+    the token. Call check_auth_status() to poll for completion.
+    """
+    import urllib.parse as _up
+    import wsgiref.simple_server as _wsgi
+    import os
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    with _auth_state["lock"]:
+        _auth_state["url"] = None
+        _auth_state["error"] = None
+        _auth_state["done"] = False
+
+    captured: dict = {}
+
+    def _app(environ, start_response):
+        captured["query"] = environ.get("QUERY_STRING", "")
+        app_url = os.environ.get("HW_APP_URL", "http://127.0.0.1:8000")
+        body = (f"""<!doctype html><html><head><meta charset="utf-8">
+<title>Classroom HW Helper</title>
+<style>
+:root{{--paper:#f5f0e8;--ink:#121212;--red:#d02020;--blue:#1040c0;--yellow:#f2c230}}
+*{{box-sizing:border-box}}body{{margin:0;min-height:100vh;display:grid;place-items:center;
+background:var(--blue);color:#fff;font-family:Arial,sans-serif;text-align:center;padding:24px}}
+.card{{width:min(620px,100%);background:var(--paper);color:var(--ink);border:4px solid var(--ink);
+box-shadow:10px 10px 0 var(--ink);padding:42px 30px}}
+h1{{margin:0 0 18px;font-size:clamp(2.2rem,8vw,4.8rem);line-height:.86;text-transform:uppercase;
+letter-spacing:-.08em}}p{{font-size:1.05rem;line-height:1.5}}
+</style></head><body>
+<div class="card"><h1>Classroom<br>HW Helper</h1>
+<p><b>Google sign-in completed.</b><br>Returning to the app...</p></div>
+<script>window.location.replace({app_url!r});</script>
+</body></html>""").encode("utf-8")
+        start_response("200 OK", [("Content-Type", "text/html"),
+                                  ("Content-Length", str(len(body)))])
+        return [body]
+
+    server = _wsgi.make_server("127.0.0.1", _auth_port(), _app)
+    port = server.server_port
+    flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET_FILE), SCOPES)
+    flow.redirect_uri = f"http://127.0.0.1:{port}/"
+    auth_url, _ = flow.authorization_url(
+        prompt="select_account consent", access_type="offline")
+
+    with _auth_state["lock"]:
+        _auth_state["url"] = auth_url
+
+    def _run():
+        try:
+            server.timeout = timeout
+            import time as _time
+            deadline = _time.time() + timeout
+            while True:
+                remaining = deadline - _time.time()
+                if remaining <= 0:
+                    with _auth_state["lock"]:
+                        _auth_state["error"] = "Timed out waiting for Google callback"
+                        _auth_state["done"] = True
+                    break
+                server.timeout = remaining
+                try:
+                    server.handle_request()
+                except Exception:
+                    continue
+                if captured.get("query"):
+                    break
+            q = _up.parse_qs(captured.get("query", ""))
+            if q.get("error"):
+                with _auth_state["lock"]:
+                    _auth_state["error"] = "Google refused access: %s" % q["error"][0]
+                    _auth_state["done"] = True
+            elif not (q.get("code") or [None])[0]:
+                with _auth_state["lock"]:
+                    _auth_state["error"] = "No authorization code received"
+                    _auth_state["done"] = True
+            else:
+                code = q["code"][0]
+                granted = (q.get("scope") or [""])[0].split() or list(SCOPES)
+                flow.oauth2session.scope = granted
+                flow.fetch_token(code=code)
+                creds = flow.credentials
+                token_file = token_path()
+                token_file.write_text(creds.to_json(), encoding="utf-8")
+                scopes_path().write_text(
+                    __import__("json").dumps(granted), encoding="utf-8")
+                _assign_google_profile(creds, token_file)
+                with _auth_state["lock"]:
+                    _auth_state["done"] = True
+        except Exception as e:
+            with _auth_state["lock"]:
+                _auth_state["error"] = str(e)
+                _auth_state["done"] = True
+        finally:
+            server.server_close()
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return auth_url
+
+
+def check_auth_status() -> dict:
+    """Return {done: bool, error: str|None, url: str|None}."""
+    with _auth_state["lock"]:
+        return {"done": _auth_state["done"],
+                "error": _auth_state["error"],
+                "url": _auth_state["url"]}
+
+
 def _loopback_authorize(client_secret: str, scopes: list[str],
                         open_browser: bool, timeout: int = 180):
     """Run a loopback OAuth flow tolerant to Google substituting scopes.
@@ -120,21 +235,11 @@ background:var(--blue);color:#fff;font-family:Arial,sans-serif;text-align:center
 .card{{width:min(620px,100%);background:var(--paper);color:var(--ink);border:4px solid var(--ink);
 box-shadow:10px 10px 0 var(--ink);padding:42px 30px}}
 h1{{margin:0 0 18px;font-size:clamp(2.2rem,8vw,4.8rem);line-height:.86;text-transform:uppercase;
-letter-spacing:-.08em}}p{{font-size:1.05rem;line-height:1.5}}#count{{display:grid;place-items:center;
-width:92px;height:92px;margin:24px auto 0;background:var(--red);color:#fff;border:4px solid var(--ink);
-font-size:3rem;font-weight:900;box-shadow:6px 6px 0 var(--ink)}}
+letter-spacing:-.08em}}p{{font-size:1.05rem;line-height:1.5}}
 </style></head><body>
 <div class="card"><h1>Classroom<br>HW Helper</h1>
-<p><b>Google sign-in completed.</b><br>This window will close and return to the app.</p>
-<div id="count">3</div></div>
-<script>
-let n=3; const count=document.getElementById('count');
-const timer=setInterval(function(){{n-=1;count.textContent=n;if(n<=0){{
- clearInterval(timer);
- window.open('','_self'); window.close();
- setTimeout(function(){{window.location.replace({app_url!r});}},250);
-}} }},1000);
-</script>
+<p><b>Google sign-in completed.</b><br>Redirecting to the app...</p></div>
+<script>window.location.replace({app_url!r});</script>
 </body></html>""").encode("utf-8")
         start_response("200 OK", [("Content-Type", "text/html"),
                                   ("Content-Length", str(len(body)))])
