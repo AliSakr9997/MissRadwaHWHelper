@@ -4,6 +4,10 @@ cd /d "%~dp0"
 
 set "APP_URL=http://127.0.0.1:8000"
 
+rem Stop duplicate MissRadwaHWHelper servers on old preview ports.
+rem Only matching app.server processes on ports 8790/8765 are targeted.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ports=8790,8765; foreach($port in $ports){Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | ForEach-Object {$proc=Get-CimInstance Win32_Process -Filter ('ProcessId='+$_.OwningProcess) -ErrorAction SilentlyContinue; if($proc -and $proc.CommandLine -match '(-m\s+app\.server|app\\server\.py)'){Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue}}}"
+
 if not exist "config\client_secret.json" (
     echo Google Classroom is not configured yet.
     echo Add the Desktop OAuth JSON at config\client_secret.json before signing in.
