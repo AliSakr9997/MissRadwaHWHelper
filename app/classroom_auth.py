@@ -110,7 +110,7 @@ def _loopback_authorize(client_secret: str, scopes: list[str],
     def _app(environ, start_response):
         captured["query"] = environ.get("QUERY_STRING", "")
         body = ("""<!doctype html><html><head><meta charset="utf-8">
-<title>MissRadwaHWHelper sign-in complete</title>
+<title>Classroom HW Helper sign-in complete</title>
 <style>body{font-family:Arial,sans-serif;text-align:center;padding:48px}
 h3{margin-bottom:10px}small{color:#555}</style></head><body>
 <h3>Google sign-in completed.</h3>

@@ -502,7 +502,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def run(host: str = "127.0.0.1", port: int = 8000) -> None:
-    print(f"MissRadwaHWHelper local UI -> http://{host}:{port}  (offline, Ctrl+C to stop)")
+    print(f"Classroom HW Helper local UI -> http://{host}:{port}  (offline, Ctrl+C to stop)")
     server = ThreadingHTTPServer((host, port), Handler)
     try:
         server.serve_forever()

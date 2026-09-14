@@ -1,4 +1,4 @@
-# MissRadwaHWHelper (offline, local-first)
+# Classroom HW Helper (offline, local-first)
 
 Teacher assistant: organize HW files → mark → preview/approve reports → copy/send.
 AI does admin. Teacher does academic judgment.

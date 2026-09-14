@@ -309,7 +309,7 @@ def cmd_classroom(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="hwhelper", description="MissRadwaHWHelper offline CLI")
+    p = argparse.ArgumentParser(prog="hwhelper", description="Classroom HW Helper offline CLI")
     p.add_argument("--profile", default=None,
                    help="teacher profile (isolated roster/token/homework, e.g. --profile sara)")
     sub = p.add_subparsers(dest="cmd", required=True)

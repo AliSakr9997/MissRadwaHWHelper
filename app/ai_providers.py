@@ -123,7 +123,7 @@ class OpenRouterProvider(OpenAICompatibleProvider):
     def _headers(self) -> dict:
         return {"Authorization": f"Bearer {self.api_key}",
                 "HTTP-Referer": "http://127.0.0.1:8000",
-                "X-Title": "MissRadwaHWHelper"}
+                "X-Title": "Classroom HW Helper"}
 
     @staticmethod
     def default_models() -> list[str]:
