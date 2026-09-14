@@ -4,27 +4,57 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MissRadwaHWHelper (offline)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f5f5f5;color:#222}
-header{background:#1f6feb;color:#fff;padding:10px 16px}
-nav button{margin:4px;padding:8px 14px;border:0;border-radius:6px;cursor:pointer}
-nav button.active{background:#1f6feb;color:#fff}
-.tab{display:none;padding:16px;max-width:1100px;margin:auto}
+*{box-sizing:border-box}
+:root{--ink:#121212;--paper:#f0f0f0;--white:#fff;--red:#d02020;--blue:#1040c0;--yellow:#f0c020;--muted:#e0e0e0}
+html{background:var(--paper)}
+body{font-family:'Outfit',Arial,sans-serif;margin:0;background:var(--paper);color:var(--ink);font-size:16px;font-weight:500}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;background-image:radial-gradient(var(--ink) 1px,transparent 1px);background-size:18px 18px;z-index:-1}
+header{position:relative;overflow:hidden;background:var(--blue);color:#fff;padding:26px clamp(20px,5vw,72px);border-bottom:4px solid var(--ink);min-height:150px}
+header:after{content:"";position:absolute;width:150px;height:150px;border:4px solid var(--ink);background:var(--yellow);border-radius:50%;right:8%;top:-65px}
+header b{display:block;font-size:clamp(2rem,5vw,4.5rem);line-height:.9;letter-spacing:-.07em;text-transform:uppercase;font-weight:900;max-width:780px;position:relative;z-index:1}
+header small{display:inline-block;margin-top:16px;font-size:.9rem;letter-spacing:.08em;text-transform:uppercase;position:relative;z-index:1}
+header small:first-of-type{background:var(--ink);padding:5px 8px}
+header small:last-of-type{margin-left:10px}
+nav{display:flex;gap:8px;flex-wrap:wrap;padding:18px 0 12px;border-bottom:4px solid var(--ink);position:relative}
+nav:before{content:"";width:20px;height:20px;background:var(--red);border:2px solid var(--ink);border-radius:50%;position:absolute;right:18px;top:-12px}
+nav button{margin:0;padding:10px 14px;border:2px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);cursor:pointer;font:700 .8rem 'Outfit',sans-serif;letter-spacing:.08em;text-transform:uppercase;box-shadow:4px 4px 0 var(--ink);transition:transform .15s,box-shadow .15s}
+nav button:hover{background:var(--yellow);transform:translate(-2px,-2px)}
+nav button.active{background:var(--red);color:#fff;transform:translate(2px,2px);box-shadow:none}
+.tab{display:none;padding:42px 0 70px;max-width:1180px;margin:auto}
 .tab.active{display:block}
-.card{background:#fff;border-radius:8px;padding:14px;margin:10px 0;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-label{display:block;margin:6px 0 2px;font-weight:600}
-input,select,textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-pre{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px}
-button.primary{background:#1f6feb;color:#fff;border:0;padding:9px 16px;border-radius:6px;cursor:pointer}
-button.ghost{background:#eee;border:0;padding:9px 12px;border-radius:6px;cursor:pointer}
-#viewerWrap{position:relative;border:1px solid #ccc;background:#999}
+.tab:before{content:"";display:block;width:52px;height:12px;background:var(--red);margin-bottom:12px;transform:skewX(-25deg)}
+.tab h3{font-size:clamp(1.8rem,4vw,3.1rem);line-height:.95;letter-spacing:-.05em;text-transform:uppercase;margin:0 0 18px;font-weight:900}
+.tab> .card:first-child>h3:after{content:"";display:inline-block;width:17px;height:17px;background:var(--yellow);border:3px solid var(--ink);margin-left:12px;vertical-align:middle}
+.card{position:relative;background:var(--white);border:4px solid var(--ink);border-radius:0;padding:clamp(18px,3vw,30px);margin:22px 0;box-shadow:8px 8px 0 var(--ink);transition:transform .15s}
+.card:hover{transform:translateY(-3px)}
+.card:nth-child(3n){box-shadow:8px 8px 0 var(--red)}
+label{display:block;margin:14px 0 5px;font-weight:700;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase}
+input,select,textarea{width:100%;padding:11px 12px;border:3px solid var(--ink);border-radius:0;background:#fff;color:var(--ink);font:500 1rem 'Outfit',sans-serif}
+input:focus,select:focus,textarea:focus,button:focus{outline:3px solid var(--yellow);outline-offset:3px}
+textarea{min-height:92px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+pre{white-space:pre-wrap;background:var(--ink);color:#fff;padding:18px;border:3px solid var(--ink);border-left:12px solid var(--red);border-radius:0;font:500 1rem/1.55 'Outfit',sans-serif}
+button.primary,button.ghost{padding:11px 16px;border:2px solid var(--ink);border-radius:0;cursor:pointer;font:700 .8rem 'Outfit',sans-serif;letter-spacing:.08em;text-transform:uppercase;box-shadow:4px 4px 0 var(--ink);transition:transform .15s,box-shadow .15s}
+button.primary{background:var(--red);color:#fff}
+button.ghost{background:var(--yellow);color:var(--ink)}
+button.primary:hover,button.ghost:hover{opacity:.9;transform:translate(-2px,-2px)}
+button.primary:active,button.ghost:active{transform:translate(2px,2px);box-shadow:none}
+#viewerWrap{position:relative;border:4px solid var(--ink);background:#777;box-shadow:6px 6px 0 var(--ink)}
 #pdfEmbed{width:100%;height:70vh;background:#fff}
 #overlay{position:absolute;inset:0;touch-action:none;cursor:crosshair}
-.toolbar button{margin-right:6px}
-.warn{background:#fff3cd;padding:8px;border-radius:6px}
-table{width:100%;border-collapse:collapse}
-td,th{border:1px solid #ddd;padding:6px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.toolbar button{margin:0}
+.warn{background:var(--yellow);padding:12px;border:3px solid var(--ink);border-radius:0;font-weight:700}
+table{width:100%;border-collapse:collapse;background:#fff;border:3px solid var(--ink)}
+td,th{border:2px solid var(--ink);padding:9px;text-align:left}
+th{background:var(--ink);color:#fff;text-transform:uppercase;font-size:.72rem;letter-spacing:.08em}
+code{background:var(--yellow);padding:2px 5px;border:1px solid var(--ink)}
+small{line-height:1.45}
+@media(max-width:700px){header{padding:22px 18px;min-height:130px}header:after{right:-45px;top:-40px;width:120px;height:120px}.tab{padding:28px 0 52px}.row{grid-template-columns:1fr;gap:0}.card{box-shadow:5px 5px 0 var(--ink);border-width:3px}.card:nth-child(3n){box-shadow:5px 5px 0 var(--red)}nav button{flex:1 1 calc(50% - 8px);font-size:.68rem}#viewerWrap{box-shadow:4px 4px 0 var(--ink)}}
 </style>
 </head>
 <body>
