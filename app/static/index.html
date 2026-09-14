@@ -265,6 +265,8 @@ document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'))
 document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
 b.classList.add('active');$('tab-'+b.dataset.tab).classList.add('active');});
 async function api(p,m,b){const r=await fetch(p,{method:m||'GET',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});return r.json();}
+let closingApp=false;
+window.addEventListener('pagehide',()=>{if(closingApp)return;closingApp=true;navigator.sendBeacon('/api/shutdown','');});
 if($('aiConfigCard'))$('settingsPanel').appendChild($('aiConfigCard'));
 api('/api/profile').then(j=>{if(j.profile){$('profileTag').textContent='· profile: '+j.profile;$('settingsProfile').value=j.profile;}$('downloadPath').value=j.downloadPath||'';}).catch(()=>{});
 api('/api/classroom/setup').then(j=>{

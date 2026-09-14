@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -212,6 +213,14 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/classroom/logout":
             from . import classroom_auth
             _send_json(self, {"ok": classroom_auth.logout()})
+            return
+        if parsed.path == "/api/shutdown":
+            _send_json(self, {"ok": True})
+            threading.Thread(
+                target=lambda: (threading.Event().wait(0.2),
+                                self.server.shutdown()),
+                daemon=True,
+            ).start()
             return
         if parsed.path == "/api/preferences":
             from . import profiles
@@ -494,7 +503,11 @@ class Handler(SimpleHTTPRequestHandler):
 
 def run(host: str = "127.0.0.1", port: int = 8000) -> None:
     print(f"MissRadwaHWHelper local UI -> http://{host}:{port}  (offline, Ctrl+C to stop)")
-    ThreadingHTTPServer((host, port), Handler).serve_forever()
+    server = ThreadingHTTPServer((host, port), Handler)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
 
 
 if __name__ == "__main__":
