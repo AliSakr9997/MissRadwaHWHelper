@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MissRadwaHWHelper (offline)</title>
+<title>MISS RADWA HW HELPER</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -19,11 +19,13 @@ header b{display:block;font-size:clamp(2rem,5vw,4.5rem);line-height:.9;letter-sp
 header small{display:inline-block;margin-top:16px;font-size:.9rem;letter-spacing:.08em;text-transform:uppercase;position:relative;z-index:1}
 header small:first-of-type{background:var(--ink);padding:5px 8px}
 header small:last-of-type{margin-left:10px}
-nav{display:flex;gap:8px;flex-wrap:wrap;padding:18px 0 12px;border-bottom:4px solid var(--ink);position:relative}
+nav{display:flex;flex-direction:column;gap:8px;padding:18px 14px 18px 0;position:relative}
 nav:before{content:"";width:20px;height:20px;background:var(--red);border:2px solid var(--ink);border-radius:50%;position:absolute;right:18px;top:-12px}
-nav button{margin:0;padding:10px 14px;border:2px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);cursor:pointer;font:700 .8rem 'Outfit',sans-serif;letter-spacing:.08em;text-transform:uppercase;box-shadow:4px 4px 0 var(--ink);transition:transform .15s,box-shadow .15s}
+nav button{margin:0;padding:13px 14px;border:2px solid var(--ink);border-radius:0;background:var(--white);color:var(--ink);cursor:pointer;text-align:left;font:700 .8rem 'Outfit',sans-serif;letter-spacing:.08em;text-transform:uppercase;box-shadow:4px 4px 0 var(--ink);transition:transform .15s,box-shadow .15s}
 nav button:hover{background:var(--yellow);transform:translate(-2px,-2px)}
 nav button.active{background:var(--red);color:#fff;transform:translate(2px,2px);box-shadow:none}
+.app-shell{display:grid;grid-template-columns:220px minmax(0,1fr);gap:28px;max-width:1400px;margin:auto;padding:0 clamp(18px,4vw,60px)}
+.content{min-width:0}
 .tab{display:none;padding:42px 0 70px;max-width:1180px;margin:auto}
 .tab.active{display:block}
 .tab:before{content:"";display:block;width:52px;height:12px;background:var(--red);margin-bottom:12px;transform:skewX(-25deg)}
@@ -54,21 +56,40 @@ td,th{border:2px solid var(--ink);padding:9px;text-align:left}
 th{background:var(--ink);color:#fff;text-transform:uppercase;font-size:.72rem;letter-spacing:.08em}
 code{background:var(--yellow);padding:2px 5px;border:1px solid var(--ink)}
 small{line-height:1.45}
+.signin-screen{position:fixed;inset:0;background:var(--paper);z-index:20;display:grid;place-items:center;padding:24px}
+.signin-screen.hidden{display:none}
+.signin-card{width:min(620px,100%);background:var(--white);border:4px solid var(--ink);box-shadow:10px 10px 0 var(--ink);padding:clamp(24px,5vw,56px);position:relative}
+.signin-card:before{content:"";position:absolute;width:72px;height:72px;border-radius:50%;background:var(--red);border:4px solid var(--ink);right:28px;top:-36px}
+.signin-card h1{font-size:clamp(2.4rem,8vw,5.5rem);line-height:.86;letter-spacing:-.08em;text-transform:uppercase;margin:0 0 24px;font-weight:900;max-width:480px}
+.signin-card p{font-size:1.1rem;line-height:1.5;max-width:470px}
+.signin-error{background:#fff0f0;border:3px solid var(--red);padding:10px;margin-top:16px;font-weight:700}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media(max-width:700px){header{padding:22px 18px;min-height:130px}header:after{right:-45px;top:-40px;width:120px;height:120px}.tab{padding:28px 0 52px}.row{grid-template-columns:1fr;gap:0}.card{box-shadow:5px 5px 0 var(--ink);border-width:3px}.card:nth-child(3n){box-shadow:5px 5px 0 var(--red)}nav button{flex:1 1 calc(50% - 8px);font-size:.68rem}#viewerWrap{box-shadow:4px 4px 0 var(--ink)}}
+@media(max-width:800px){.app-shell{grid-template-columns:1fr;gap:0}.content{order:1}nav{order:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:14px 0;border-bottom:4px solid var(--ink)}.settings-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<header><b>MissRadwaHWHelper</b> — offline localhost &nbsp;<small>AI does admin · teacher does judgment</small> <small id="profileTag"></small></header>
-<div style="max-width:1100px;margin:auto;padding:8px">
+<div id="signinScreen" class="signin-screen">
+<div class="signin-card">
+<h1>MISS RADWA<br>HW HELPER</h1>
+<p>Sign in with your Google teacher account to load your classes, assignments, students, and homework submissions.</p>
+<button class="primary" id="btnSignIn">Sign in with Google</button>
+<div id="signinError" class="signin-error" style="display:none"></div>
+</div>
+</div>
+<header><b>MISS RADWA<br>HW HELPER</b><small>AI does admin · teacher does judgment</small> <small id="profileTag"></small></header>
+<div class="app-shell">
 <nav>
-<button data-tab="reports" class="active">1 · Reports</button>
-<button data-tab="classroom">2 · Classroom</button>
-<button data-tab="batch">3 · Batch paste</button>
-<button data-tab="airep">4 · AI ✨</button>
-<button data-tab="files">5 · Files &amp; Mark</button>
-<button data-tab="roster">6 · Roster</button>
-<button data-tab="missing">7 · Missing HW</button>
+<button data-tab="classroom" class="active">01 · Classroom</button>
+<button data-tab="reports">02 · Reports</button>
+<button data-tab="files">03 · Files &amp; Mark</button>
+<button data-tab="batch">04 · Batch paste</button>
+<button data-tab="airep">05 · AI Reports</button>
+<button data-tab="missing">06 · Missing HW</button>
+<button data-tab="roster">07 · Roster</button>
+<button data-tab="settings">08 · Profile &amp; Settings</button>
 </nav>
+<main class="content">
 
 <!-- CLASSROOM -->
 <section id="tab-classroom" class="tab">
@@ -87,7 +108,7 @@ small{line-height:1.45}
 </section>
 
 <!-- REPORTS -->
-<section id="tab-reports" class="tab active">
+<section id="tab-reports" class="tab">
 <div class="card">
 <h3>Teacher summary → Preview → Approve → Copy</h3>
 <label>Assignment key</label><input id="rKey" value="2026-09-05_example_assignment">
@@ -217,6 +238,19 @@ small{line-height:1.45}
 <div id="mGrouped"></div>
 </div>
 </section>
+<!-- SETTINGS -->
+<section id="tab-settings" class="tab">
+<div class="card">
+<h3>Profile &amp; Settings</h3>
+<p>Manage the teacher profile, sign-in state, report templates, and AI connection for this local workspace.</p>
+<div class="settings-grid">
+<div><label>Active teacher profile</label><input id="settingsProfile" readonly></div>
+<div><label>Google Classroom</label><button class="primary" id="btnSettingsSignIn">Sign in / refresh connection</button></div>
+</div>
+<div id="settingsStatus" class="warn" style="margin-top:18px">Your data stays in this local teacher profile.</div>
+</div>
+</section>
+</main>
 </div>
 
 <script>
@@ -226,7 +260,26 @@ document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'))
 document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
 b.classList.add('active');$('tab-'+b.dataset.tab).classList.add('active');});
 async function api(p,m,b){const r=await fetch(p,{method:m||'GET',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});return r.json();}
-api('/api/profile').then(j=>{if(j.profile)$('profileTag').textContent='· profile: '+j.profile;}).catch(()=>{});
+api('/api/profile').then(j=>{
+  if(j.profile){$('profileTag').textContent='· profile: '+j.profile;$('settingsProfile').value=j.profile;}
+}).catch(()=>{});
+async function signIn(){
+  $('signinError').style.display='none';
+  $('btnSignIn').disabled=true;
+  $('btnSignIn').textContent='Connecting...';
+  try{
+    const j=await api('/api/classroom/courses');
+    if(!j.ok)throw new Error(j.error||'Google sign-in failed');
+    $('signinScreen').classList.add('hidden');
+    $('cwStatus').textContent='Connected. Choose a class and assignment.';
+    await loadClassroomCourses();
+  }catch(e){
+    $('signinError').textContent=e.message;
+    $('signinError').style.display='block';
+  }finally{$('btnSignIn').disabled=false;$('btnSignIn').textContent='Sign in with Google';}
+}
+$('btnSignIn').onclick=signIn;
+$('btnSettingsSignIn').onclick=async()=>{await signIn();$('settingsStatus').textContent='Google Classroom connection refreshed.';};
 // reports
 $('btnPreview').onclick=async()=>{
 const body={assignmentKey:$('rKey').value,student_query:$('rStudent').value,freeText:$('rFree').value||undefined,
@@ -276,7 +329,6 @@ $('btnDownloadSelected').onclick=async()=>{
   $('cwStatus').textContent=j.ok?'Downloaded and organized '+(j.manifest.submissions||[]).length+' submissions.':('Error: '+j.error);
   if(j.ok)loadAssign();
 };
-loadClassroomCourses();
 // files
 async function loadAssign(){const a=await api('/api/assignments');$('fAssign').innerHTML=a.map(x=>`<option>${x.key}</option>`).join('');
 $('fAssign').onchange=()=>{const cur=a.find(x=>x.key===$('fAssign').value);$('fFile').innerHTML=(cur?cur.files:[]).map(f=>`<option>${f}</option>`).join('');loadPdf();};
@@ -328,7 +380,11 @@ $('cCourse').onchange=loadWork;
 $('btnClassFetch').onclick=async()=>{const j=await api('/api/classroom/fetch','POST',{courseId:$('cCourse').value,courseworkId:$('cWork').value,assignmentKey:$('cKey').value});
 if(!j.ok){$('cResult').textContent='Error: '+j.error;return;}
 $('cResult').innerHTML='<b>Saved to '+j.assignmentKey+'</b><br>Missing: '+(j.missing.join(', ')||'none')+(j.empty.length?'<br>Empty turn-ins: '+j.empty.join(', '):'')+(j.unmapped.length?'<br>Unmapped: '+j.unmapped.length+' (see CLI reconcile)':'');loadMissingTab();};
-loadCourses();
+// Classroom courses are loaded once after sign-in and shared with Missing HW.
+$('btnSignIn').addEventListener('click',async()=>{
+  const sync=()=>{$('cCourse').innerHTML=$('cwCourse').innerHTML;$('cCourse').value=$('cwCourse').value;loadWork();};
+  setTimeout(sync,100);
+});
 // batch
 let batchPayload=null;
 $('btnBatchPreview').onclick=async()=>{const j=await api('/api/batch/preview','POST',{text:$('bText').value,dates:$('bDates').value,year:$('bYear').value});
