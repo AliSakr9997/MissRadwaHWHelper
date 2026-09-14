@@ -10,6 +10,13 @@ pip install -r requirements.txt
 python -m app.server          # -> http://127.0.0.1:8000
 ```
 
+### Windows double-click launcher
+
+After installing the dependencies once, double-click **`Start MissRadwaHWHelper.bat`**
+in the project folder. It starts the local server and opens the app in your
+default browser automatically. Keep the black server window open while using
+the app; close it to stop the local server.
+
 Tabs: **1 · Reports** (form + free-text → preview → approve → copy),
 **2 · Batch paste** (multi-student log → full output document → approve all),
 **3 · Files & Mark** (PDF + stylus overlay → save to `marked/`),

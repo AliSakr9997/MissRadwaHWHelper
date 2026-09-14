@@ -253,7 +253,8 @@ def _download_drive_file(drive, file_id: str, dest) -> str:
 
 
 def download_assignment(creds, course_id: str, coursework_id: str,
-                        assignment_key: str) -> dict:
+                        assignment_key: str,
+                        user_ids: set[str] | None = None) -> dict:
     """Download TURNED_IN/RETURNED attachments into homework/<key>/original/.
 
     PDFs/images land as files; Google Docs/Slides export to PDF; bare links
@@ -267,6 +268,8 @@ def download_assignment(creds, course_id: str, coursework_id: str,
     manifest = []
     for s in subs:
         if classify(s) != "submitted":
+            continue
+        if user_ids is not None and s.get("userId") not in user_ids:
             continue
         attachments = ((s.get("assignmentSubmission") or {}).get("attachments") or [])
         got = []

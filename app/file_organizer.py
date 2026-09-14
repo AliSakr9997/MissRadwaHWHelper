@@ -54,8 +54,11 @@ def assignment_dirs(assignment_key: str) -> dict[str, Path]:
     return paths
 
 
-def next_unique_pdf(normalized_dir: Path, official_name: str) -> Path:
+def next_unique_pdf(normalized_dir: Path, official_name: str,
+                    assignment_name: str = "") -> Path:
     safe = sanitize(official_name)
+    if assignment_name:
+        safe = f"{safe} - {sanitize(assignment_name)}"
     candidate = normalized_dir / f"{safe}.pdf"
     if not candidate.exists():
         return candidate
@@ -67,8 +70,9 @@ def next_unique_pdf(normalized_dir: Path, official_name: str) -> Path:
         v += 1
 
 
-def normalize_pdf(src: Path, normalized_dir: Path, official_name: str) -> Path:
-    dest = next_unique_pdf(normalized_dir, official_name)
+def normalize_pdf(src: Path, normalized_dir: Path, official_name: str,
+                  assignment_name: str = "") -> Path:
+    dest = next_unique_pdf(normalized_dir, official_name, assignment_name)
     shutil.copy2(src, dest)
     return dest
 
@@ -101,8 +105,9 @@ def images_to_pdf(image_paths: list[Path], dest: Path) -> Path:
     return dest
 
 
-def normalize_images(image_paths: list[Path], normalized_dir: Path, official_name: str) -> Path:
-    dest = next_unique_pdf(normalized_dir, official_name)
+def normalize_images(image_paths: list[Path], normalized_dir: Path, official_name: str,
+                     assignment_name: str = "") -> Path:
+    dest = next_unique_pdf(normalized_dir, official_name, assignment_name)
     return images_to_pdf(image_paths, dest)
 
 
@@ -126,10 +131,11 @@ def merge_pdfs(pdf_paths: list[Path], dest: Path) -> Path:
     return dest
 
 
-def normalize_pdfs(pdf_paths: list[Path], normalized_dir: Path, official_name: str) -> Path:
+def normalize_pdfs(pdf_paths: list[Path], normalized_dir: Path, official_name: str,
+                   assignment_name: str = "") -> Path:
     if len(pdf_paths) == 1:
-        return normalize_pdf(pdf_paths[0], normalized_dir, official_name)
-    dest = next_unique_pdf(normalized_dir, official_name)
+        return normalize_pdf(pdf_paths[0], normalized_dir, official_name, assignment_name)
+    dest = next_unique_pdf(normalized_dir, official_name, assignment_name)
     return merge_pdfs(pdf_paths, dest)
 
 
@@ -148,7 +154,8 @@ def dedupe_files(paths: list[Path]) -> tuple[list[Path], int]:
     return list(seen.values()), dups
 
 
-def organize_originals(assignment_key: str, uid_to_official: dict[str, str]) -> dict:
+def organize_originals(assignment_key: str, uid_to_official: dict[str, str],
+                       assignment_name: str = "") -> dict:
     """Group original/ files by Classroom userId prefix and normalize per student.
 
     Returns {official_name: {"pdf": path|None, "images": [...], "skipped": [...],
@@ -176,9 +183,9 @@ def organize_originals(assignment_key: str, uid_to_official: dict[str, str]) -> 
         imgs, img_dups = dedupe_files(imgs)
         try:
             if pdfs and not imgs:
-                dest = normalize_pdfs(pdfs, dirs["normalized"], official)
+                dest = normalize_pdfs(pdfs, dirs["normalized"], official, assignment_name)
             elif imgs and not pdfs:
-                dest = normalize_images(imgs, dirs["normalized"], official)
+                dest = normalize_images(imgs, dirs["normalized"], official, assignment_name)
             elif pdfs and imgs:
                 dest = None
                 raise ValueError("mixed pdf+images, merge manually")
