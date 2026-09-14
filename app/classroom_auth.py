@@ -31,6 +31,35 @@ def is_configured() -> bool:
     return CLIENT_SECRET_FILE.exists()
 
 
+def setup_status() -> dict:
+    """Return safe setup diagnostics without exposing OAuth credentials."""
+    status = {
+        "clientSecret": False,
+        "clientSecretValid": False,
+        "clientType": "",
+        "scopes": len(SCOPES),
+    }
+    if not CLIENT_SECRET_FILE.exists():
+        return status
+    status["clientSecret"] = True
+    try:
+        import json as _json
+        payload = _json.loads(CLIENT_SECRET_FILE.read_text(encoding="utf-8"))
+        client_type = next((key for key in ("installed", "web") if key in payload), "")
+        client = payload.get(client_type) if client_type else None
+        status["clientType"] = client_type
+        status["clientSecretValid"] = bool(
+            isinstance(client, dict)
+            and client.get("client_id")
+            and client.get("client_secret")
+            and client.get("auth_uri")
+            and client.get("token_uri")
+        )
+    except (OSError, ValueError, TypeError):
+        pass
+    return status
+
+
 def token_path() -> Path:
     profiles.ensure_profile()
     return profiles.token_file()

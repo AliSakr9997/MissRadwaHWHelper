@@ -65,14 +65,24 @@ Real names and `homework/` data never commit (see `.gitignore`).
 
 One-time setup (in Google Cloud Console):
 
-1. New project → enable **Google Classroom API** + **Google Drive API**.
-2. OAuth consent screen → **External**, add yourself as test user.
-3. Credentials → OAuth client ID → **Desktop app** → download JSON →
-   save as `config/client_secret.json` (gitignored, never share).
-4. Back here, run (browser opens once, token stays local):
+1. In the existing Google Cloud project, enable **Google Classroom API** and
+   **Google Drive API** under **APIs & Services → Library**.
+2. Configure **OAuth consent screen** as **External**, keep it in **Testing**
+   mode, and add every teacher account under **Test users**. Testing mode
+   supports the first-release multi-teacher setup; each teacher must authorize
+   their own Google account.
+3. Under **Credentials**, create or use an OAuth client ID with application
+   type **Desktop app**, then download its JSON.
+4. Copy that downloaded file to
+   `C:\Users\alisa\Downloads\MissRadwaHWHelper\config\client_secret.json`.
+   The filename must be exactly `client_secret.json`. It is gitignored and
+   must never be shared or committed.
+5. Double-click `Start MissRadwaHWHelper.bat`. The sign-in page checks for the
+   local client file, opens Google OAuth in the browser, and explains common
+   setup errors. On first sign-in, grant every requested Classroom and Drive
+   permission:
 
 ```powershell
-pip install -r requirements.txt
 python -m app.main classroom auth
 python -m app.main classroom courses
 python -m app.main classroom summary --course COURSE_ID
@@ -81,7 +91,9 @@ python -m app.main classroom summary --course COURSE_ID
 If sign-in fails with a permissions/scope message: revoke the app at
 myaccount.google.com → Security → Third-party access, run
 `python -m app.main classroom logout`, then `auth` again keeping ALL
-permission checkboxes ticked.
+permission checkboxes ticked. If Google reports that an API is not enabled,
+return to the Cloud project and enable both APIs listed above. The app only
+requests read-only access; it does not write back to Classroom.
 
 ## AI reports (optional, your own key)
 

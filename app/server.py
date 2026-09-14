@@ -20,6 +20,7 @@ Routes:
   POST /api/annotate/save          -> {assignmentKey, file, dataUrl} -> marked/<file>.png + .json
   GET  /api/classroom/summary      -> ?courseId= — read-only per-assignment counts
                                      (auth via CLI `classroom auth`; errors if not configured)
+  GET  /api/classroom/setup        -> safe local OAuth setup diagnostics
   GET  /api/classroom/courses      -> teacher courses (for dropdowns)
   GET  /api/classroom/work         -> ?courseId= coursework list
   POST /api/classroom/fetch        -> {courseId, courseworkId, assignmentKey}
@@ -135,6 +136,9 @@ class Handler(SimpleHTTPRequestHandler):
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
                 return
             _send_json(self, {"ok": True, "summary": summary})
+        elif parsed.path == "/api/classroom/setup":
+            from . import classroom_auth
+            _send_json(self, {"ok": True, **classroom_auth.setup_status()})
         elif parsed.path == "/api/classroom/courses":
             from . import classroom, classroom_auth
             try:

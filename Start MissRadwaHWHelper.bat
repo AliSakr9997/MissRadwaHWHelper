@@ -4,6 +4,12 @@ cd /d "%~dp0"
 
 set "APP_URL=http://127.0.0.1:8000"
 
+if not exist "config\client_secret.json" (
+    echo Google Classroom is not configured yet.
+    echo Add the Desktop OAuth JSON at config\client_secret.json before signing in.
+    echo The app will still start so you can review offline features.
+)
+
 rem Wait for the server, then open the browser even if dependencies need installing.
 start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$deadline=(Get-Date).AddSeconds(120); while((Get-Date) -lt $deadline){try{if((Test-NetConnection -ComputerName 127.0.0.1 -Port 8000 -WarningAction SilentlyContinue).TcpTestSucceeded){Start-Process '%APP_URL%'; exit}}catch{}; Start-Sleep -Seconds 1}"
 
