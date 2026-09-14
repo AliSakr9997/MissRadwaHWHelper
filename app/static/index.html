@@ -63,7 +63,7 @@ button.primary:active,button.ghost:active{transform:translate(2px,2px);box-shado
 #mChecks small{display:block;font-size:1.1rem;line-height:1.55;margin-bottom:12px}
 #mList{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
 #mList label{margin:0;padding:10px;border:2px solid var(--ink);font-size:1rem;text-transform:none;letter-spacing:0}
-.gender-select{min-width:82px!important;font-weight:800}
+.gender-select{min-width:42px!important;font-weight:800}
 .editor-controls{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:10px 0}
 .editor-controls label{margin:0;min-width:110px}
 .editor-controls input,.editor-controls select{width:auto;min-width:90px;padding:8px}
@@ -196,6 +196,12 @@ small{line-height:1.45}
 <section id="tab-files" class="tab">
 <div class="card">
 <h3>Files per assignment + stylus marking</h3>
+<div class="card"><b>From Classroom</b> <small>(fetch submissions + download files)</small>
+<div class="row"><div><label>Course</label><select id="fCourse"></select></div>
+<div><label>Assignment</label><select id="fWork"></select></div></div>
+<label>Local assignment key</label><input id="fKey" value="2026-09-05_hw">
+<p><button class="primary" id="btnFetchFiles">Fetch &amp; Download from Classroom</button></p>
+<div id="fFetchResult"></div></div>
 <label>Assignment name / date</label><div class="row"><select id="fAssign"></select><button class="ghost" id="btnOpenAssignmentFolder">Open assignment folder</button></div>
 <label>PDF file</label><select id="fFile"></select>
 <div class="toolbar">
@@ -299,46 +305,36 @@ small{line-height:1.45}
 </div>
 <div class="card">
 <h3>Report examples</h3>
-<p><small>See how teacher input turns into a formatted report.</small></p>
+<p><small>Edit the inputs and click <b>Refresh</b> to see how your report template formats them. Edits are saved locally.</small></p>
+<div style="margin:10px 0"><button class="ghost" id="btnRefreshExamples">Refresh examples</button> <button class="ghost" id="btnResetExamples">Reset to defaults</button></div>
 <div class="row">
 <div>
 <label>Teacher input (individual)</label>
-<pre style="font-size:.85rem">Sara Ali
+<textarea id="exInput1" rows="6" style="font-size:.85rem;width:100%">Sara Ali
 46/54
 8 mistakes
 very good
-note: Study again the fraction flipping in dividing</pre>
+note: Study again the fraction flipping in dividing</textarea>
 </div>
 <div>
 <label>Generated output</label>
-<pre style="font-size:.85rem">📝HW Report
-Sara Ali (Y8 5/9 Saturday)
-HW sent ontime ✅
-Mistakes (8) 🟢
-Skipped questions (none) 🟢
-Understanding (very good) 🟢
-Grade: 46/54
-
-‼️NOTE‼️
-Study again the fraction flipping in dividing.</pre>
+<pre id="exOutput1" style="font-size:.85rem"></pre>
 </div>
 </div>
 <div class="row" style="margin-top:18px">
 <div>
 <label>Teacher input (missing)</label>
-<pre style="font-size:.85rem">Omar Khaled
-didn't send hw</pre>
+<textarea id="exInput2" rows="3" style="font-size:.85rem;width:100%">Omar Khaled
+didn't send hw</textarea>
 </div>
 <div>
 <label>Generated output</label>
-<pre style="font-size:.85rem">📝HW Report
-Omar Khaled (Y8 5/9 Saturday)
-🔴 Did not send HW</pre>
+<pre id="exOutput2" style="font-size:.85rem"></pre>
 </div>
 </div>
 <div style="margin-top:18px">
 <label>Batch paste input (multiple students, day sections separated by -----)</label>
-<pre style="font-size:.85rem">Sara Ali
+<textarea id="exInput3" rows="10" style="font-size:.85rem;width:100%">Sara Ali
 46/54
 8 mistakes
 very good
@@ -352,7 +348,7 @@ Remas Salah
 39/54
 4 mistakes
 1 skipped
-good</pre>
+good</textarea>
 </div>
 </div>
 </section>
@@ -474,6 +470,46 @@ if($('btnOpenAssignmentFolder'))$('btnOpenAssignmentFolder').onclick=async()=>{c
 function fitCanvas(){const w=$('viewerWrap'),c=$('overlay');c.width=w.clientWidth;c.height=w.clientHeight;redraw();}
 function loadPdf(){const k=$('fAssign').value,f=$('fFile').value;if(!f)return;$('pdfEmbed').src=`/homework/${encodeURIComponent(k)}/normalized/${encodeURIComponent(f)}`;setTimeout(fitCanvas,300);}
 $('fFile').onchange=loadPdf;window.onresize=fitCanvas;loadAssign();
+// Files & Mark — Classroom fetch
+async function loadFilesCourses(){
+  try{
+    const j=await api('/api/classroom/courses');
+    if(!j.ok||!j.courses)return;
+    $('fCourse').innerHTML=j.courses.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    await loadFilesWork();
+  }catch(e){}
+}
+async function loadFilesWork(){
+  const id=$('fCourse').value;if(!id)return;
+  try{
+    const j=await api('/api/classroom/work?courseId='+encodeURIComponent(id));
+    if(!j.ok)return;
+    $('fWork').innerHTML=j.coursework.map(w=>`<option value="${w.id}">${w.title}</option>`).join('');
+    const w=j.coursework[0];if(w){$('fKey').value=new Date().toISOString().slice(0,10)+'_hw';}
+  }catch(e){}
+}
+$('fCourse').onchange=loadFilesWork;
+$('btnFetchFiles').onclick=async()=>{
+  const nameEl=$('fWork').selectedOptions[0];
+  $('btnFetchFiles').disabled=true;$('btnFetchFiles').textContent='Downloading...';
+  try{
+    const j=await api('/api/classroom/download','POST',{
+      courseId:$('fCourse').value,
+      courseworkId:$('fWork').value,
+      assignmentKey:$('fKey').value,
+      assignmentName:nameEl?nameEl.textContent:''
+    });
+    if(!j.ok)throw new Error(j.error||'Download failed');
+    $('fFetchResult').innerHTML='<b>Downloaded to '+j.assignmentKey+'</b><br>Files: '+Object.keys(j.manifest||{}).length+'<br>Organized: '+(j.organized?'yes':'no');
+    await loadAssign();
+    // Auto-select the new assignment
+    const sel=$('fAssign');
+    for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===j.assignmentKey){sel.selectedIndex=i;sel.dispatchEvent(new Event('change'));break;}}
+  }catch(e){
+    $('fFetchResult').textContent='Error: '+e.message;
+  }finally{$('btnFetchFiles').disabled=false;$('btnFetchFiles').textContent='Fetch & Download from Classroom';}
+};
+loadFilesCourses();
 // annotation
 let tool='pen',strokes=[],redoStack=[],cur=null,start=null;
 const cv=$('overlay'),ctx=cv.getContext('2d');
@@ -497,9 +533,9 @@ black:{c:$('presetBlackColor').value,s:+$('presetBlackSize').value}}[b.dataset.p
 if(p){$('markColor').value=p.c;$('markSize').value=p.s;}});
 document.querySelectorAll('.color-btn').forEach(b=>b.onclick=()=>{$('markColor').value=b.dataset.color;});
 // roster
-async function loadRoster(){const s=await api('/api/students');$('rosterBody').innerHTML=s.map((r,i)=>`<tr><td><input data-i="${i}" data-k="id" value="${r.id||''}"></td><td><input data-i="${i}" data-k="officialName" value="${r.officialName||''}"></td><td><input data-i="${i}" data-k="arabicFirst" value="${r.arabicFirst||''}"></td><td><select class="gender-select" data-i="${i}" data-k="gender"><option value="m" ${r.gender!=='f'?'selected':''}>Male (M)</option><option value="f" ${r.gender==='f'?'selected':''}>Female (F)</option></select></td><td><input data-i="${i}" data-k="classroomId" value="${r.classroomId||''}"></td><td><input data-i="${i}" data-k="variants" value="${(r.variants||[]).join(', ')}"></td><td><input type="checkbox" data-i="${i}" data-k="active" ${r.active===false?'':'checked'}></td><td><input type="checkbox" data-i="${i}" data-k="onClassroom" ${r.onClassroom===false?'':'checked'}></td></tr>`).join('');}
+async function loadRoster(){const s=await api('/api/students');$('rosterBody').innerHTML=s.map((r,i)=>`<tr><td><input data-i="${i}" data-k="id" value="${r.id||''}"></td><td><input data-i="${i}" data-k="officialName" value="${r.officialName||''}"></td><td><input data-i="${i}" data-k="arabicFirst" value="${r.arabicFirst||''}"></td><td><select class="gender-select" data-i="${i}" data-k="gender"><option value="m" ${r.gender!=='f'?'selected':''}>M</option><option value="f" ${r.gender==='f'?'selected':''}>F</option></select></td><td><input data-i="${i}" data-k="classroomId" value="${r.classroomId||''}"></td><td><input data-i="${i}" data-k="variants" value="${(r.variants||[]).join(', ')}"></td><td><input type="checkbox" data-i="${i}" data-k="active" ${r.active===false?'':'checked'}></td><td><input type="checkbox" data-i="${i}" data-k="onClassroom" ${r.onClassroom===false?'':'checked'}></td></tr>`).join('');}
 $('btnLoadRoster').onclick=loadRoster;
-$('btnAddRow').onclick=()=>{$('rosterBody').insertAdjacentHTML('beforeend','<tr><td><input data-k="id"></td><td><input data-k="officialName"></td><td><input data-k="arabicFirst"></td><td><select class="gender-select" data-k="gender"><option value="m">Male (M)</option><option value="f">Female (F)</option></select></td><td><input data-k="classroomId"></td><td><input data-k="variants"></td><td><input type="checkbox" data-k="active" checked></td><td><input type="checkbox" data-k="onClassroom" checked></td></tr>');};
+$('btnAddRow').onclick=()=>{$('rosterBody').insertAdjacentHTML('beforeend','<tr><td><input data-k="id"></td><td><input data-k="officialName"></td><td><input data-k="arabicFirst"></td><td><select class="gender-select" data-k="gender"><option value="m">M</option><option value="f">F</option></select></td><td><input data-k="classroomId"></td><td><input data-k="variants"></td><td><input type="checkbox" data-k="active" checked></td><td><input type="checkbox" data-k="onClassroom" checked></td></tr>');};
 $('btnSaveRoster').onclick=async()=>{const rows=[...$('rosterBody').querySelectorAll('tr')];const students=rows.map(tr=>{const g=k=>tr.querySelector(`[data-k="${k}"]`);return{id:g('id').value.trim(),officialName:g('officialName').value.trim(),arabicFirst:g('arabicFirst').value.trim(),gender:g('gender').value,classroomId:g('classroomId').value.trim(),variants:g('variants').value.split(',').map(s=>s.trim()).filter(Boolean),active:g('active').checked,onClassroom:g('onClassroom').checked};});
 const j=await api('/api/students','POST',{students});alert(j.ok?'Saved '+j.count:'Error');};
 loadRoster();
@@ -590,5 +626,61 @@ $('btnTemplateSave').onclick=async()=>{
  $('tplStatus').textContent=j.ok?'Saved.':'Error: '+j.error;
 };
 loadTemplate();
+
+// Editable report examples — integrated with current template
+const _exDefaults={
+  input1:"Sara Ali\n46/54\n8 mistakes\nvery good\nnote: Study again the fraction flipping in dividing",
+  input2:"Omar Khaled\ndidn't send hw",
+  input3:"Sara Ali\n46/54\n8 mistakes\nvery good\n\n-----\n\nOmar Khaled\ndidn't send hw\n\nRemas Salah\n39/54\n4 mistakes\n1 skipped\ngood"
+};
+function _exLoad(k){try{return localStorage.getItem('ex_'+k)||_exDefaults[k]||'';}catch(e){return _exDefaults[k]||'';}}
+function _exSave(k,v){try{localStorage.setItem('ex_'+k,v);}catch(e){}}
+function _renderExamples(){
+  const hdr=$('tplHeader').value||'📝HW Report';
+  const noteHdr=$('tplNoteHeader').value||'‼️NOTE‼️';
+  // Individual example
+  const in1=$('exInput1').value;
+  const lines1=in1.split('\n').map(l=>l.trim()).filter(Boolean);
+  const name1=lines1[0]||'Sara Ali';
+  let grade1='',mis1=0,skip1=0,und1='',note1='';
+  for(let i=1;i<lines1.length;i++){
+    const l=lines1[i];
+    if(/^\d+\s*\/\s*\d+$/.test(l))grade1=l;
+    else if(/^\d+\s*mistake/.test(l))mis1=parseInt(l)||0;
+    else if(/^\d+\s*skip/.test(l))skip1=parseInt(l)||0;
+    else if(/^note:\s*/i.test(l))note1=l.replace(/^note:\s*/i,'');
+    else und1=l;
+  }
+  const m=mis1<=4?'🟢':'🔴', s=skip1===0?'🟢':'🔴';
+  const u=(und1.toLowerCase().includes('excellent')||und1.toLowerCase().includes('very good'))?'🟢':
+          (und1.toLowerCase().includes('poor'))?'🔴':'🟢';
+  let out1=`${hdr}\n${name1} (Y8 5/9 Saturday)\n`;
+  out1+=`HW sent ontime ✅\nMistakes (${mis1}) ${m}\nSkipped questions (${skip1===0?'none':skip1}) ${s}\nUnderstanding (${und1||'N/A'}) ${u}\n`;
+  if(grade1)out1+=`Grade: ${grade1}\n`;
+  if(note1)out1+=`\n${noteHdr}\n${note1}`;
+  $('exOutput1').textContent=out1;
+  // Missing example
+  const in2=$('exInput2').value;
+  const lines2=in2.split('\n').map(l=>l.trim()).filter(Boolean);
+  const name2=lines2[0]||'Omar Khaled';
+  $('exOutput2').textContent=`${hdr}\n${name2} (Y8 5/9 Saturday)\n🔴 Did not send HW`;
+  // Batch example (show as raw input — format is the same)
+  $('exInput3').value=_exLoad('input3');
+}
+function _syncExampleInputs(){
+  $('exInput1').value=_exLoad('input1');
+  $('exInput2').value=_exLoad('input2');
+  $('exInput3').value=_exLoad('input3');
+}
+_syncExampleInputs();
+_renderExamples();
+$('exInput1').oninput=()=>{_exSave('input1',$('exInput1').value);_renderExamples();};
+$('exInput2').oninput=()=>{_exSave('input2',$('exInput2').value);_renderExamples();};
+$('exInput3').oninput=()=>{_exSave('input3',$('exInput3').value);};
+$('btnRefreshExamples').onclick=_renderExamples;
+$('btnResetExamples').onclick=()=>{Object.keys(_exDefaults).forEach(k=>localStorage.removeItem('ex_'+k));_syncExampleInputs();_renderExamples();};
+// Re-render examples when template changes
+const _origTemplateSave=$('btnTemplateSave').onclick;
+$('btnTemplateSave').onclick=async()=>{await _origTemplateSave();_renderExamples();};
 </script>
 </body></html>
