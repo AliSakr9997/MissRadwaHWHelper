@@ -97,7 +97,15 @@ def _assignments() -> list[dict]:
                 f.write_text("[]", encoding="utf-8")
         reports = json.loads((base / "reports.json").read_text(encoding="utf-8"))
         missing = json.loads((base / "missing.json").read_text(encoding="utf-8"))
-        out.append({"key": base.name, "files": files, "reportCount": len(reports), "missing": missing})
+        meta = {}
+        mf = base / "meta.json"
+        if mf.exists():
+            try:
+                meta = json.loads(mf.read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError):
+                meta = {}
+        out.append({"key": base.name, "name": meta.get("assignmentName", base.name),
+                    "files": files, "reportCount": len(reports), "missing": missing})
     return out
 
 
@@ -125,7 +133,7 @@ class Handler(SimpleHTTPRequestHandler):
                                    "message": missing.build_student_message(s, keys)})
             _send_json(self, {"byAssignment": by_assignment, "byStudent": by_student})
         elif parsed.path == "/api/classroom/summary":
-            from . import classroom, classroom_auth
+            from . import classroom, classroom_auth, profiles
             course = (parse_qs(parsed.query).get("courseId") or [None])[0]
             if not course:
                 _send_json(self, {"ok": False, "error": "courseId required"}, 400)
@@ -141,7 +149,7 @@ class Handler(SimpleHTTPRequestHandler):
             from . import classroom_auth
             _send_json(self, {"ok": True, **classroom_auth.setup_status()})
         elif parsed.path == "/api/classroom/courses":
-            from . import classroom, classroom_auth
+            from . import classroom, classroom_auth, profiles
             force_reauth = (parse_qs(parsed.query).get("reauth") or ["0"])[0] == "1"
             try:
                 creds = classroom_auth.get_credentials(force_reauth=force_reauth)
@@ -153,7 +161,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             _send_json(self, {"ok": True, "courses": courses})
         elif parsed.path == "/api/classroom/work":
-            from . import classroom, classroom_auth
+            from . import classroom, classroom_auth, profiles
             course = (parse_qs(parsed.query).get("courseId") or [None])[0]
             if not course:
                 _send_json(self, {"ok": False, "error": "courseId required"}, 400)
@@ -168,7 +176,9 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, {"ok": True, "coursework": work})
         elif parsed.path == "/api/profile":
             from . import profiles
-            _send_json(self, {"profile": profiles.current(),
+            email_file = profiles.data_dir() / "account_email.txt"
+            email = email_file.read_text(encoding="utf-8").strip() if email_file.exists() else ""
+            _send_json(self, {"profile": profiles.current(), "account": email or profiles.current(),
                               "downloadPath": str(profiles.homework_dir())})
         elif parsed.path == "/api/preferences":
             from . import profiles
@@ -239,6 +249,30 @@ class Handler(SimpleHTTPRequestHandler):
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
                 return
             _send_json(self, {"ok": True, "downloadPath": str(path)})
+            return
+        if parsed.path == "/api/preferences/choose":
+            from . import profiles
+            TclError = RuntimeError
+            try:
+                import tkinter as tk
+                from tkinter import TclError, filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes("-topmost", True)
+                chosen = filedialog.askdirectory(
+                    title="Choose Classroom HW Helper homework folder")
+                root.destroy()
+                if not chosen:
+                    _send_json(self, {"ok": False, "cancelled": True})
+                    return
+                path = Path(chosen).expanduser()
+                path.mkdir(parents=True, exist_ok=True)
+                (profiles.data_dir() / "preferences.json").write_text(
+                    json.dumps({"download_path": str(path)}, ensure_ascii=False, indent=2),
+                    encoding="utf-8")
+                _send_json(self, {"ok": True, "downloadPath": str(path)})
+            except (OSError, ImportError, RuntimeError, TclError) as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
             return
         if parsed.path == "/api/students":
             students = _read_json(self).get("students", [])
@@ -358,7 +392,7 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, {"ok": True,
                               "assignments": [d["key"] for d in payload.get("days", [])]})
         elif parsed.path == "/api/classroom/fetch":
-            from . import classroom, classroom_auth
+            from . import classroom, classroom_auth, profiles
             data = _read_json(self)
             if not data.get("courseId") or not data.get("courseworkId") \
                     or not data.get("assignmentKey"):
@@ -370,6 +404,12 @@ class Handler(SimpleHTTPRequestHandler):
                 creds = classroom_auth.get_credentials()
                 st = classroom.fetch_status(creds, data.get("courseId", ""),
                                             data.get("courseworkId", ""), roster.load())
+                meta_path = profiles.homework_dir() / str(data["assignmentKey"]) / "meta.json"
+                meta_path.parent.mkdir(parents=True, exist_ok=True)
+                meta_path.write_text(json.dumps({
+                    "date": str(data["assignmentKey"])[:10],
+                    "assignmentName": str(data.get("assignmentName") or data["assignmentKey"])
+                }, ensure_ascii=False), encoding="utf-8")
                 missing.save_missing(data.get("assignmentKey", ""), st["missingIds"])
             except Exception as e:
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
@@ -416,6 +456,11 @@ class Handler(SimpleHTTPRequestHandler):
                 organized = file_organizer.organize_originals(
                     str(data["assignmentKey"]), uid_to_name,
                     str(data.get("assignmentName") or "Homework"))
+                meta_path = profiles.homework_dir() / str(data["assignmentKey"]) / "meta.json"
+                meta_path.write_text(json.dumps({
+                    "date": str(data["assignmentKey"])[:10],
+                    "assignmentName": str(data.get("assignmentName") or "Homework")
+                }, ensure_ascii=False), encoding="utf-8")
             except Exception as e:
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
                 return

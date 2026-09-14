@@ -103,19 +103,28 @@ def _loopback_authorize(client_secret: str, scopes: list[str],
     import urllib.parse as _up
     import webbrowser as _wb
     import wsgiref.simple_server as _wsgi
+    import os
     from google_auth_oauthlib.flow import InstalledAppFlow
 
     captured: dict = {}
 
     def _app(environ, start_response):
         captured["query"] = environ.get("QUERY_STRING", "")
-        body = ("""<!doctype html><html><head><meta charset="utf-8">
+        app_url = os.environ.get("HW_APP_URL", "http://127.0.0.1:8000")
+        body = (f"""<!doctype html><html><head><meta charset="utf-8">
 <title>Classroom HW Helper sign-in complete</title>
-<style>body{font-family:Arial,sans-serif;text-align:center;padding:48px}
-h3{margin-bottom:10px}small{color:#555}</style></head><body>
+<style>body{{font-family:Arial,sans-serif;text-align:center;padding:48px}}
+h3{{margin-bottom:10px}}#count{{font-size:1.2rem;font-weight:bold;color:#1040c0}}</style></head><body>
 <h3>Google sign-in completed.</h3>
-<small>This window will close automatically in 3 seconds.</small>
-<script>setTimeout(function(){window.close();},3000);</script>
+<p>This page will close and return to Classroom HW Helper.</p>
+<div id="count">3</div>
+<script>
+let n=3; const count=document.getElementById('count');
+const timer=setInterval(function(){{n-=1;count.textContent=n;if(n<=0){{
+ clearInterval(timer); window.close();
+ setTimeout(function(){{window.location.replace({app_url!r});}},300);
+}}}},1000);
+</script>
 </body></html>""").encode("utf-8")
         start_response("200 OK", [("Content-Type", "text/html"),
                                   ("Content-Length", str(len(body)))])
@@ -250,10 +259,20 @@ def _assign_google_profile(creds, token_file: Path) -> None:
         except (OSError, ValueError, TypeError, _json.JSONDecodeError):
             pass
     if not email:
+        try:
+            from googleapiclient.discovery import build
+            classroom = build("classroom", "v1", credentials=creds,
+                              cache_discovery=False)
+            email = str(classroom.userProfiles().get(userId="me").execute()
+                        .get("emailAddress", ""))
+        except Exception:
+            pass
+    if not email:
         return
     local = email.split("@", 1)[0].lower()
     local = re.sub(r"[^a-z0-9_-]+", "-", local).strip("-")[:40] or "teacher"
     if local == profiles.current():
+        (profiles.data_dir() / "account_email.txt").write_text(email, encoding="utf-8")
         return
     old = profiles.data_dir()
     new = profiles.data_dir(local)
@@ -262,6 +281,7 @@ def _assign_google_profile(creds, token_file: Path) -> None:
     scopes = old / "granted_scopes.json"
     if scopes.exists():
         _shutil.copy2(scopes, new / "granted_scopes.json")
+    (new / "account_email.txt").write_text(email, encoding="utf-8")
     import os as _os
     _os.environ["HW_PROFILE"] = local
 

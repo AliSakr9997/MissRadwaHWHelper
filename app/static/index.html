@@ -47,9 +47,14 @@ button.primary:hover,button.ghost:hover{opacity:.9;transform:translate(-2px,-2px
 button.primary:active,button.ghost:active{transform:translate(2px,2px);box-shadow:none}
 #viewerWrap{position:relative;border:4px solid var(--ink);background:#777;box-shadow:6px 6px 0 var(--ink)}
 #pdfEmbed{width:100%;height:70vh;background:#fff}
-#overlay{position:absolute;inset:0;touch-action:none;cursor:crosshair}
+#overlay{position:absolute;inset:0;pointer-events:none;touch-action:none;cursor:crosshair}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
 .toolbar button{margin:0}
+.toolbar.bottom-toolbar{margin-top:18px}
+.mark-help{display:block;font-size:1rem;line-height:1.55;margin:18px 0}
+.preset{min-width:86px}
+.copy-box{font-size:1rem;line-height:1.6;white-space:pre-wrap}
+.cwStudent,#mList input{width:20px;height:20px;vertical-align:middle}
 .editor-controls{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:10px 0}
 .editor-controls label{margin:0;min-width:110px}
 .editor-controls input,.editor-controls select{width:auto;min-width:90px;padding:8px}
@@ -118,10 +123,10 @@ small{line-height:1.45}
 <section id="tab-batch" class="tab">
 <div class="card">
 <h3>Reports &amp; batch paste — individual or full log</h3>
-<p>Use the individual report form for one student, or the batch form below for several students and days. Both produce editable output before saving.</p>
+<p>Page 02 is the teacher-controlled reporting desk: use it when you already know the marks and want deterministic reports. Page 04 is optional AI assistance that extracts structured data from natural language before the same validation.</p>
 <label>Individual assignment key</label><input id="rKey" value="2026-09-05_example_assignment">
 <div class="row"><div><label>Student</label><input id="rStudent" placeholder="Sara Ali"></div><div><label>Free-text shortcut</label><textarea id="rFree" rows="2" placeholder="Sara Ali&#10;46/54&#10;8 mistakes"></textarea></div></div>
-<div class="row"><div><label>Grade num / den</label><div class="row"><input id="rNum" type="number" value="46"><input id="rDen" type="number" value="54"></div></div><div><label>Date + year</label><div class="row"><input id="rDate" value="2026-09-05"><input id="rYear" value="Y8"></div></div></div>
+<div class="row"><div><label>Grade num / den</label><div class="row"><input id="rNum" type="number" value="46"><input id="rDen" type="number" value="54"></div></div><div><label>Date + Class</label><div class="row"><input id="rDate" type="date" value="2026-09-05"><input id="rYear" value="Y8"></div></div></div>
 <div class="row"><div><label>Mistakes / skipped</label><div class="row"><input id="rMis" type="number" value="0"><input id="rSkip" type="number" value="0"></div></div><div><label>Understanding / submission</label><div class="row"><select id="rUnd"><option>excellent</option><option selected>very good</option><option>good</option><option>weak</option><option>poor</option></select><select id="rOntime"><option value="1" selected>on time</option><option value="0">late</option></select></div></div></div>
 <label>Teacher note</label><textarea id="rNote" rows="2" placeholder="Optional feedback"></textarea>
 <p><button class="primary" id="btnPreview">Preview individual</button><button class="ghost" id="btnApprove" disabled>Approve &amp; save</button><button class="ghost" id="btnCopy">Copy report</button></p>
@@ -130,8 +135,8 @@ small{line-height:1.45}
 <hr>
 <label>Paste (day sections separated by <code>-----</code> / <code>Monday HW</code> lines)</label>
 <textarea id="bText" rows="10" placeholder="Sara Ali&#10;Didn't send hw&#10;&#10;Omar Khaled&#10;46/54&#10;..."></textarea>
-<div class="row"><div><label>Dates per day section (comma ISO)</label><input id="bDates" value="2026-09-05,2026-09-07"></div>
-<div><label>Year</label><input id="bYear" value="Y8"></div></div>
+<div class="row"><div><label>Dates per day section (comma ISO)</label><input id="bDates" value="2026-09-05,2026-09-07"><input id="bDatePicker" type="date"><button class="ghost" id="btnAddBatchDate">Add date</button></div>
+<div><label>Class</label><input id="bYear" value="Y8"></div></div>
 <p><button class="primary" id="btnBatchPreview">Preview all</button>
 <button class="ghost" id="btnBatchApprove" disabled>Approve all &amp; save</button>
 <button class="ghost" id="btnBatchCopy">Copy output</button></p>
@@ -144,7 +149,7 @@ small{line-height:1.45}
 <section id="tab-airep" class="tab">
 <div class="card" id="aiConfigCard">
 <h3>AI provider (your own key, stored only on this machine)</h3>
-<p><small>Choose a provider, create its API key in that provider's developer dashboard, paste it below, save, then use Test connection. The key stays in this teacher profile and is never displayed in full.</small></p>
+<p><small><b>How to use:</b> choose a provider, create an API key in that provider's developer dashboard, paste it below, choose the model, click Save config, then Test connection. Use OpenAI-compatible providers for hosted APIs; use Custom with a local URL for LM Studio or another compatible server. The key stays encrypted in this teacher profile and is never displayed in full. AI is optional; Page 02 works without it.</small></p>
 <div class="row"><div><label>Provider</label><select id="aProv"></select></div>
 <div><label>Model</label><input id="aModel" list="aModelList" placeholder="e.g. gpt-4o-mini"><datalist id="aModelList"></datalist></div></div>
 <label>API key</label><input id="aKey" type="password" placeholder="never shown back, only ····last4">
@@ -153,7 +158,7 @@ small{line-height:1.45}
 <button class="ghost" id="btnAiTest">Test connection</button>
 <span id="aStatus"><small></small></span></p>
 </div>
-<div class="card">
+<div class="card" id="templateCard">
 <h3>Report template</h3>
 <p><small>These labels are saved per teacher profile and can be changed without code.</small></p>
 <label>Report header</label><input id="tplHeader">
@@ -165,8 +170,8 @@ small{line-height:1.45}
 <h3>Free-form log → AI → validated reports</h3>
 <small>Write naturally — no rigid syntax. Numbers/names are validated by the app; anything unclear becomes Needs Review.</small>
 <label>Paste</label><textarea id="aText" rows="8" placeholder="Sara did 46 out of 54, 8 mistakes, very good..."></textarea>
-<div class="row"><div><label>Dates per day section (comma ISO)</label><input id="aDates" value="2026-09-05"></div>
-<div><label>Year</label><input id="aYear" value="Y8"></div></div>
+<div class="row"><div><label>Dates per day section (comma ISO)</label><input id="aDates" value="2026-09-05"><input id="aDatePicker" type="date"><button class="ghost" id="btnAddAiDate">Add date</button></div>
+<div><label>Class</label><input id="aYear" value="Y8"></div></div>
 <p><button class="primary" id="btnAiPreview">Preview all</button>
 <button class="ghost" id="btnAiApprove" disabled>Approve all &amp; save</button>
 <button class="ghost" id="btnAiCopy">Copy output</button></p>
@@ -179,7 +184,7 @@ small{line-height:1.45}
 <section id="tab-files" class="tab">
 <div class="card">
 <h3>Files per assignment + stylus marking</h3>
-<label>Assignment</label><select id="fAssign"></select>
+<label>Assignment name / date</label><select id="fAssign"></select>
 <label>PDF file</label><select id="fFile"></select>
 <div class="toolbar">
 <button class="ghost" data-tool="pen">✏️ Pen</button>
@@ -199,13 +204,19 @@ small{line-height:1.45}
 <button class="ghost" id="btnClear">🗑️ Clear</button>
 <button class="primary" id="btnSaveMarks">💾 Save marks</button>
 </div>
+<div class="toolbar bottom-toolbar">
+<button class="primary" id="btnSaveMarksBottom">💾 Save marks</button>
+<button class="ghost preset" data-preset="red">Red · 3</button>
+<button class="ghost preset" data-preset="blue">Blue · 5</button>
+<button class="ghost preset" data-preset="black">Black · 7</button>
+</div>
 <div class="editor-controls">
 <label>Color <input id="markColor" type="color" value="#d02020"></label>
 <label>Size <input id="markSize" type="range" min="1" max="32" value="3"></label>
 <label>Opacity <input id="markOpacity" type="range" min="10" max="100" value="100"></label>
 </div>
 <div id="viewerWrap"><embed id="pdfEmbed"><canvas id="overlay"></canvas></div>
-<small>Tip: use a tablet stylus for pressure-sensitive pen marks. Text opens a prompt; shapes, colors, opacity, undo/redo, and overlays are saved next to the PDF in <code>marked/</code>.</small>
+<small class="mark-help">Choose a mark tool first. The PDF itself remains clickable until a drawing tool is selected, so browser controls and page borders are not captured by the canvas. The three presets pair a primary color with a stroke/font size. Text, shapes, colors, opacity, undo/redo, and overlays are saved next to the PDF in <code>marked/</code>.</small>
 </div>
 </section>
 
@@ -216,7 +227,7 @@ small{line-height:1.45}
 <p><button class="ghost" id="btnLoadRoster">Reload</button>
 <button class="primary" id="btnSaveRoster">Save roster</button>
 <button class="ghost" id="btnAddRow">+ Add student</button></p>
-<table><thead><tr><th>ID <small>(local stable key)</small></th><th>Official name <small>(reports/display)</small></th><th>Arabic first</th><th>M/F</th><th>Classroom ID <small>(Google link)</small></th><th>variants (comma)</th><th>active</th><th>onClass</th></tr></thead>
+<table><thead><tr><th>ID <small>(local stable key used by saved reports)</small></th><th>Official name <small>(the human name shown in reports)</small></th><th>Arabic first</th><th>M/F</th><th>Classroom ID <small>(Google's student link)</small></th><th>variants (comma)</th><th>active</th><th>onClass</th></tr></thead>
 <tbody id="rosterBody"></tbody></table>
 </div>
 </section>
@@ -235,7 +246,9 @@ small{line-height:1.45}
 <div id="mChecks" class="card"><small>Tick students who <b>submitted</b>, then Compute.</small><div id="mList"></div></div>
 <p><button class="primary" id="btnComputeMissing">Compute missing</button>
 <button class="ghost" id="btnLoadMissing">Reload all missing</button></p>
-<div id="mMissing"></div>
+<div id="mMissing" class="copy-box"></div>
+<pre id="mCopyOut" class="copy-box">Missing homework messages will appear here...</pre>
+<button class="ghost" id="btnCopyMissing">Copy ready-to-send messages</button>
 <h3>Grouped by student (ready to copy)</h3>
 <div id="mGrouped"></div>
 </div>
@@ -252,6 +265,7 @@ small{line-height:1.45}
 <div id="settingsPanel"></div>
 <label>Homework download folder <small>(where assignment folders, PDFs, marked overlays, and reports are stored)</small></label>
 <input id="downloadPath" placeholder="C:\Users\...\ClassroomHomework">
+<button class="ghost" id="btnChooseDownloadPath">Choose folder</button>
 <button class="ghost" id="btnSaveDownloadPath">Save download folder</button>
 <p><small>Local assignment key is the safe folder identifier. Assignment name is the readable label used for organized filenames. The download folder controls the parent location for these local files; Google Classroom itself is not changed.</small></p>
 <div id="settingsStatus" class="warn" style="margin-top:18px">Your data stays in this local teacher profile.</div>
@@ -270,7 +284,11 @@ async function api(p,m,b){const r=await fetch(p,{method:m||'GET',headers:{'Conte
 let closingApp=false;
 window.addEventListener('pagehide',()=>{if(closingApp)return;closingApp=true;navigator.sendBeacon('/api/shutdown','');});
 if($('aiConfigCard'))$('settingsPanel').appendChild($('aiConfigCard'));
-api('/api/profile').then(j=>{if(j.profile){$('profileTag').textContent='· profile: '+j.profile;$('settingsProfile').value=j.profile;}$('downloadPath').value=j.downloadPath||'';}).catch(()=>{});
+if($('templateCard'))$('settingsPanel').appendChild($('templateCard'));
+function addDateTo(inputId,pickerId){const value=$(pickerId).value;if(!value)return;const dates=$(inputId).value.split(',').map(x=>x.trim()).filter(Boolean);if(!dates.includes(value))dates.push(value);$(inputId).value=dates.join(',');}
+if($('btnAddBatchDate'))$('btnAddBatchDate').onclick=()=>addDateTo('bDates','bDatePicker');
+if($('btnAddAiDate'))$('btnAddAiDate').onclick=()=>addDateTo('aDates','aDatePicker');
+api('/api/profile').then(j=>{if(j.account){$('profileTag').textContent='· '+j.account;$('settingsProfile').value=j.account;}$('downloadPath').value=j.downloadPath||'';}).catch(()=>{});
 api('/api/classroom/setup').then(j=>{
   const el=$('signinSetup');
   if(!j.clientSecret){el.textContent='Setup needed: save your Desktop OAuth JSON as config/client_secret.json.';}
@@ -278,6 +296,7 @@ api('/api/classroom/setup').then(j=>{
   else{el.textContent='Google OAuth client is ready. The first sign-in will ask for Classroom and Drive permissions.';}
 }).catch(()=>{$('signinSetup').textContent='Unable to check local Google setup.';});
 if($('btnSaveDownloadPath'))$('btnSaveDownloadPath').onclick=async()=>{const j=await api('/api/preferences','POST',{downloadPath:$('downloadPath').value});$('settingsStatus').textContent=j.ok?'Download folder saved. Restart the launcher/server before the next download.':'Error: '+j.error;};
+if($('btnChooseDownloadPath'))$('btnChooseDownloadPath').onclick=async()=>{const j=await api('/api/preferences/choose','POST',{});if(j.ok){$('downloadPath').value=j.downloadPath;$('settingsStatus').textContent='Download folder selected and saved.';}else if(!j.cancelled)$('settingsStatus').textContent='Could not choose folder: '+(j.error||'unknown error');};
 async function signIn(){
   $('signinError').style.display='none';
   $('btnSignIn').disabled=true;
@@ -286,7 +305,7 @@ async function signIn(){
     const j=await api('/api/classroom/courses?reauth=1');
     if(!j.ok)throw new Error(j.error||'Google sign-in failed');
     $('signinScreen').classList.add('hidden');
-    const profile=await api('/api/profile'); if(profile.profile){$('profileTag').textContent='· profile: '+profile.profile;$('settingsProfile').value=profile.profile;}
+    const profile=await api('/api/profile'); if(profile.account){$('profileTag').textContent='· '+profile.account;$('settingsProfile').value=profile.account;}
     $('cwStatus').textContent='Connected. Choose a class and assignment.';
     await loadClassroomCourses();
   }catch(e){
@@ -313,12 +332,14 @@ $('btnCopy').onclick=()=>{navigator.clipboard.writeText($('finalReport').value);
 
 // Classroom class board and selective attachment download
 let classroomCourses=[], classroomWork=[], classroomStudents=[];
+function syncMissingCourse(){if($('cCourse')){$('cCourse').innerHTML=$('cwCourse').innerHTML;$('cCourse').value=$('cwCourse').value;loadMissingWork();}}
 async function loadClassroomCourses(){
   const j=await api('/api/classroom/courses');
   if(!j.ok){$('cwStatus').textContent='Google sign-in/data error: '+(j.error||'unknown');return;}
   classroomCourses=j.courses||[];
   $('cwCourse').innerHTML=classroomCourses.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
   await loadClassroomWork();
+  syncMissingCourse();
 }
 async function loadClassroomWork(){
   if(!$('cwCourse').value)return;
@@ -328,7 +349,7 @@ async function loadClassroomWork(){
   $('cwWork').innerHTML=classroomWork.map(w=>`<option value="${w.id}">${w.title}</option>`).join('');
   const w=classroomWork[0];if(w){$('cwName').value=w.title;$('cwKey').value=new Date().toISOString().slice(0,10)+'_hw';}
 }
-$('cwCourse').onchange=loadClassroomWork;
+$('cwCourse').onchange=()=>loadClassroomWork().then(syncMissingCourse);
 $('btnLoadSubmissions').onclick=async()=>{
   const j=await api('/api/classroom/fetch','POST',{courseId:$('cwCourse').value,courseworkId:$('cwWork').value,assignmentKey:$('cwKey').value});
   if(!j.ok){$('cwStatus').textContent='Error: '+j.error;return;}
@@ -347,7 +368,7 @@ $('btnDownloadSelected').onclick=async()=>{
   if(j.ok)loadAssign();
 };
 // files
-async function loadAssign(){const a=await api('/api/assignments');$('fAssign').innerHTML=a.map(x=>`<option>${x.key}</option>`).join('');
+async function loadAssign(){const a=await api('/api/assignments');$('fAssign').innerHTML=a.map(x=>`<option value="${x.key}">${x.name||x.key} — ${x.key.slice(0,10)}</option>`).join('');
 $('fAssign').onchange=()=>{const cur=a.find(x=>x.key===$('fAssign').value);$('fFile').innerHTML=(cur?cur.files:[]).map(f=>`<option>${f}</option>`).join('');loadPdf();};
 $('fAssign').dispatchEvent(new Event('change'));}
 function fitCanvas(){const w=$('viewerWrap'),c=$('overlay');c.width=w.clientWidth;c.height=w.clientHeight;redraw();}
@@ -362,11 +383,14 @@ function pos(e){const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*(c
 cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);start=pos(e);if(['text','note','stamp'].includes(tool)){const fallback=tool==='stamp'?'✓ Reviewed '+new Date().toLocaleDateString():(tool==='note'?'Teacher note: ':'');const text=prompt(tool==='stamp'?'Stamp text:':'Text to place on the PDF:',fallback);if(text){strokes.push({tool,text,pts:[start],w:+$('markSize').value,color:$('markColor').value,opacity:+$('markOpacity').value/100});redoStack=[];redraw();}return;}cur={tool,pts:[start],w:tool==='hl'?Math.max(8,+$('markSize').value):(+$('markSize').value||3),color:$('markColor').value,opacity:+$('markOpacity').value/100};strokes.push(cur);redoStack=[];redraw();});
 cv.addEventListener('pointermove',e=>{if(cur){const p=pos(e);if(['line','arrow','rect','ellipse'].includes(tool))cur.pts=[start,p];else cur.pts.push(p);redraw();}});
 cv.addEventListener('pointerup',()=>{if(cur&&cur.tool==='eraser'){const radius=Math.max(12,cur.w*2);const hit=p=>cur.pts.some(q=>Math.hypot(q[0]-p[0],q[1]-p[1])<=radius);strokes=strokes.filter(s=>s===cur||!s.pts.some(hit));strokes=strokes.filter(s=>s!==cur);}cur=null;start=null;redraw();});
-document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{tool=b.dataset.tool;document.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('tool-active',x===b));});
+function setTool(next,button){tool=next;cv.style.pointerEvents='auto';document.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('tool-active',x===button));}
+document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool,b));
 $('btnUndo').onclick=()=>{if(strokes.length){redoStack.push(strokes.pop());redraw();}};
 $('btnRedo').onclick=()=>{if(redoStack.length){strokes.push(redoStack.pop());redraw();}};
 $('btnClear').onclick=()=>{if(strokes.length){redoStack.push(...strokes);strokes=[];redraw();}};
-$('btnSaveMarks').onclick=async()=>{const j=await api('/api/annotate/save','POST',{assignmentKey:$('fAssign').value,file:$('fFile').value,dataUrl:cv.toDataURL('image/png'),strokes});alert(j.ok?'Marks saved to marked/':'Error');};
+async function saveMarks(){const j=await api('/api/annotate/save','POST',{assignmentKey:$('fAssign').value,file:$('fFile').value,dataUrl:cv.toDataURL('image/png'),strokes});alert(j.ok?'Marks saved to marked/':'Error');}
+$('btnSaveMarks').onclick=saveMarks;$('btnSaveMarksBottom').onclick=saveMarks;
+document.querySelectorAll('.preset').forEach(b=>b.onclick=()=>{const p={red:['#d02020',3],blue:['#1040c0',5],black:['#121212',7]}[b.dataset.preset];$('markColor').value=p[0];$('markSize').value=p[1];});
 // roster
 async function loadRoster(){const s=await api('/api/students');$('rosterBody').innerHTML=s.map((r,i)=>`<tr><td><input data-i="${i}" data-k="id" value="${r.id||''}"></td><td><input data-i="${i}" data-k="officialName" value="${r.officialName||''}"></td><td><input data-i="${i}" data-k="arabicFirst" value="${r.arabicFirst||''}"></td><td><select data-i="${i}" data-k="gender"><option value="m" ${r.gender!=='f'?'selected':''}>m</option><option value="f" ${r.gender==='f'?'selected':''}>f</option></select></td><td><input data-i="${i}" data-k="classroomId" value="${r.classroomId||''}"></td><td><input data-i="${i}" data-k="variants" value="${(r.variants||[]).join(', ')}"></td><td><input type="checkbox" data-i="${i}" data-k="active" ${r.active===false?'':'checked'}></td><td><input type="checkbox" data-i="${i}" data-k="onClassroom" ${r.onClassroom===false?'':'checked'}></td></tr>`).join('');}
 $('btnLoadRoster').onclick=loadRoster;
@@ -376,34 +400,33 @@ const j=await api('/api/students','POST',{students});alert(j.ok?'Saved '+j.count
 loadRoster();
 // missing
 async function loadMissingTab(){const a=await api('/api/assignments');const s=await api('/api/students');
-$('mAssign').innerHTML=a.map(x=>`<option>${x.key}</option>`).join('');
+$('mAssign').innerHTML=a.map(x=>`<option value="${x.key}">${x.name||x.key} — ${x.key.slice(0,10)}</option>`).join('');
 const act=s.filter(x=>x.active!==false);
 $('mList').innerHTML=act.map(x=>`<label style="font-weight:normal"><input type="checkbox" data-sid="${x.id}" checked> ${x.officialName}</label>`).join('');
 loadMissingAll();}
 $('btnComputeMissing').onclick=async()=>{const checked=[...document.querySelectorAll('#mList input:checked')].map(c=>c.dataset.sid);
 const j=await api('/api/missing/compute','POST',{assignmentKey:$('mAssign').value,submittedIds:checked});
 alert(j.ok?('Missing: '+(j.missing.join(', ')||'none')):'Error');loadMissingAll();};
-async function loadMissingAll(){const j=await api('/api/missing');
-const cur=j.byAssignment[$('mAssign').value]||[];$('mMissing').innerHTML='<b>Missing for '+$('mAssign').value+':</b> '+(cur.join(', ')||'none 🎉');
+async function loadMissingAll(){const j=await api('/api/missing');const roster=await api('/api/students');const names=Object.fromEntries(roster.map(s=>[s.id,s.officialName]));
+const cur=j.byAssignment[$('mAssign').value]||[];$('mMissing').innerHTML='<b>Missing for '+$('mAssign').selectedOptions[0].textContent+':</b> '+(cur.map(id=>names[id]||id).join(', ')||'none 🎉');
+$('mCopyOut').textContent=Object.entries(j.byAssignment).map(([key,ids])=>{const d=new Date(key.slice(0,10)+'T12:00:00');const title=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'numeric'});return ids.length?'### Did Not Send HW - '+title+'\\n'+ids.map(id=>'* '+(names[id]||id)).join('\\n'):'';}).filter(Boolean).join('\\n\\n')||'No missing homework 🎉';
 $('mGrouped').innerHTML=j.byStudent.map(g=>`<div class="card"><b>${g.officialName}</b> <small>(${g.assignments.join(', ')})</small><pre>${g.message}</pre><button class="ghost" onclick="navigator.clipboard.writeText(${JSON.stringify(g.message).replace(/</g,'\\u003c')})">Copy</button></div>`).join('')||'<small>No missing 🎉</small>';}
+$('btnCopyMissing').onclick=()=>navigator.clipboard.writeText($('mCopyOut').textContent);
 $('btnLoadMissing').onclick=loadMissingAll;
 $('mAssign').onchange=loadMissingAll;
 loadMissingTab();
 // classroom fetch
 async function loadCourses(){try{const j=await api('/api/classroom/courses');if(!j.ok)return;
 $('cCourse').innerHTML=j.courses.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-loadWork();}catch(e){}}
-async function loadWork(){const id=$('cCourse').value;if(!id)return;try{const j=await api('/api/classroom/work?courseId='+encodeURIComponent(id));if(!j.ok)return;
+loadMissingWork();}catch(e){}}
+async function loadMissingWork(){const id=$('cCourse').value;if(!id)return;try{const j=await api('/api/classroom/work?courseId='+encodeURIComponent(id));if(!j.ok)return;
 $('cWork').innerHTML=j.coursework.map(w=>`<option value="${w.id}">${w.title}</option>`).join('');}catch(e){}}
-$('cCourse').onchange=loadWork;
-$('btnClassFetch').onclick=async()=>{const j=await api('/api/classroom/fetch','POST',{courseId:$('cCourse').value,courseworkId:$('cWork').value,assignmentKey:$('cKey').value});
+$('cCourse').onchange=loadMissingWork;
+$('btnClassFetch').onclick=async()=>{const j=await api('/api/classroom/fetch','POST',{courseId:$('cCourse').value,courseworkId:$('cWork').value,assignmentKey:$('cKey').value,assignmentName:$('cWork').selectedOptions[0]?$('cWork').selectedOptions[0].textContent:''});
 if(!j.ok){$('cResult').textContent='Error: '+j.error;return;}
 $('cResult').innerHTML='<b>Saved to '+j.assignmentKey+'</b><br>Missing: '+(j.missing.join(', ')||'none')+(j.empty.length?'<br>Empty turn-ins: '+j.empty.join(', '):'')+(j.unmapped.length?'<br>Unmapped: '+j.unmapped.length+' (see CLI reconcile)':'');loadMissingTab();};
-// Classroom courses are loaded once after sign-in and shared with Missing HW.
-$('btnSignIn').addEventListener('click',async()=>{
-  const sync=()=>{$('cCourse').innerHTML=$('cwCourse').innerHTML;$('cCourse').value=$('cwCourse').value;loadWork();};
-  setTimeout(sync,100);
-});
+// Classroom courses are refreshed after sign-in and whenever the selected class changes.
+$('cwCourse').addEventListener('change',()=>{loadClassroomWork().then(syncMissingCourse);});
 // batch
 let batchPayload=null;
 $('btnBatchPreview').onclick=async()=>{const j=await api('/api/batch/preview','POST',{text:$('bText').value,dates:$('bDates').value,year:$('bYear').value});
