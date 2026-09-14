@@ -32,12 +32,29 @@ td,th{border:1px solid #ddd;padding:6px}
 <div style="max-width:1100px;margin:auto;padding:8px">
 <nav>
 <button data-tab="reports" class="active">1 · Reports</button>
-<button data-tab="batch">2 · Batch paste</button>
-<button data-tab="airep">3 · AI ✨</button>
-<button data-tab="files">4 · Files &amp; Mark</button>
-<button data-tab="roster">5 · Roster</button>
-<button data-tab="missing">6 · Missing HW</button>
+<button data-tab="classroom">2 · Classroom</button>
+<button data-tab="batch">3 · Batch paste</button>
+<button data-tab="airep">4 · AI ✨</button>
+<button data-tab="files">5 · Files &amp; Mark</button>
+<button data-tab="roster">6 · Roster</button>
+<button data-tab="missing">7 · Missing HW</button>
 </nav>
+
+<!-- CLASSROOM -->
+<section id="tab-classroom" class="tab">
+<div class="card">
+<h3>Google Classroom — choose a class and assignment</h3>
+<p>Classroom is the default source for submission and late status. Select the students to download; teacher notes can override status later in the report editor.</p>
+<div class="row"><div><label>Teacher class</label><select id="cwCourse"></select></div>
+<div><label>Assignment</label><select id="cwWork"></select></div></div>
+<label>Local assignment key</label><input id="cwKey" placeholder="2026-09-05_hw">
+<label>Assignment name</label><input id="cwName" placeholder="Fractions homework">
+<p><button class="primary" id="btnLoadSubmissions">Load students</button>
+<button class="ghost" id="btnDownloadSelected">Download selected files</button></p>
+<div id="cwStatus" class="warn">Sign in with Google when Classroom data is first requested.</div>
+<div id="cwStudents"></div>
+</div>
+</section>
 
 <!-- REPORTS -->
 <section id="tab-reports" class="tab active">
@@ -65,7 +82,8 @@ td,th{border:1px solid #ddd;padding:6px}
 <button class="ghost" id="btnApprove" disabled>Approve &amp; save</button>
 <button class="ghost" id="btnCopy">Copy report</button></p>
 <div id="needsReview" class="warn" style="display:none">Needs Review: name did not match roster exactly.</div>
-<pre id="preview">Preview appears here…</pre>
+<label>Final report (editable before saving)</label>
+<textarea id="finalReport" rows="14">Preview appears here…</textarea>
 </div>
 </section>
 
@@ -96,6 +114,14 @@ td,th{border:1px solid #ddd;padding:6px}
 <p><button class="primary" id="btnAiSave">Save config</button>
 <button class="ghost" id="btnAiTest">Test connection</button>
 <span id="aStatus"><small></small></span></p>
+</div>
+<div class="card">
+<h3>Report template</h3>
+<p><small>These labels are saved per teacher profile and can be changed without code.</small></p>
+<label>Report header</label><input id="tplHeader">
+<label>Note header</label><input id="tplNoteHeader">
+<button class="primary" id="btnTemplateSave">Save template</button>
+<span id="tplStatus"></span>
 </div>
 <div class="card">
 <h3>Free-form log → AI → validated reports</h3>
@@ -179,12 +205,48 @@ mistakes:+$('rMis').value,skipped:+$('rSkip').value,understanding:$('rUnd').valu
 note:$('rNote').value,iso_date:$('rDate').value,year:$('rYear').value,
 day:+$('rDate').value.split('-')[2],month:+$('rDate').value.split('-')[1]};
 const j=await api('/api/report/preview','POST',body);
-if(!j.ok){$('preview').textContent='Error: '+j.error;return;}
-$('preview').textContent=j.report;$('needsReview').style.display=j.needsReview?'block':'none';
+if(!j.ok){$('finalReport').value='Error: '+j.error;return;}
+$('finalReport').value=j.report;$('needsReview').style.display=j.needsReview?'block':'none';
 $('btnApprove').disabled=false;$('btnApprove').onclick=async()=>{
-const s=await api('/api/report/approve','POST',{assignmentKey:$('rKey').value,studentId:j.officialName,officialName:j.officialName,teacherInput:body,finalReport:j.report});
+const s=await api('/api/report/approve','POST',{assignmentKey:$('rKey').value,studentId:j.officialName,officialName:j.officialName,teacherInput:body,finalReport:$('finalReport').value});
 alert(s.ok?'Saved v'+s.version:'Error');};};
-$('btnCopy').onclick=()=>{navigator.clipboard.writeText($('preview').textContent);};
+$('btnCopy').onclick=()=>{navigator.clipboard.writeText($('finalReport').value);};
+
+// Classroom class board and selective attachment download
+let classroomCourses=[], classroomWork=[], classroomStudents=[];
+async function loadClassroomCourses(){
+  const j=await api('/api/classroom/courses');
+  if(!j.ok){$('cwStatus').textContent='Google sign-in/data error: '+(j.error||'unknown');return;}
+  classroomCourses=j.courses||[];
+  $('cwCourse').innerHTML=classroomCourses.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  await loadClassroomWork();
+}
+async function loadClassroomWork(){
+  if(!$('cwCourse').value)return;
+  const j=await api('/api/classroom/work?courseId='+encodeURIComponent($('cwCourse').value));
+  if(!j.ok){$('cwStatus').textContent='Could not load assignments: '+j.error;return;}
+  classroomWork=j.coursework||[];
+  $('cwWork').innerHTML=classroomWork.map(w=>`<option value="${w.id}">${w.title}</option>`).join('');
+  const w=classroomWork[0];if(w){$('cwName').value=w.title;$('cwKey').value=new Date().toISOString().slice(0,10)+'_hw';}
+}
+$('cwCourse').onchange=loadClassroomWork;
+$('btnLoadSubmissions').onclick=async()=>{
+  const j=await api('/api/classroom/fetch','POST',{courseId:$('cwCourse').value,courseworkId:$('cwWork').value,assignmentKey:$('cwKey').value});
+  if(!j.ok){$('cwStatus').textContent='Error: '+j.error;return;}
+  const rosterNames={};
+  (j.submitted||[]).forEach((name,i)=>rosterNames[(j.submittedIds||[])[i]]=name);
+  (j.missing||[]).forEach((name,i)=>rosterNames[(j.missingIds||[])[i]]=name);
+  classroomStudents=Object.keys(rosterNames).map(id=>({id,name:rosterNames[id],submitted:(j.submittedIds||[]).includes(id),late:(j.lateIds||[]).includes(id)}));
+  $('cwStudents').innerHTML=classroomStudents.map(s=>`<label style="font-weight:normal"><input type="checkbox" class="cwStudent" value="${s.id}" ${s.submitted?'checked':''} ${s.submitted?'':'disabled'}> ${s.name} ${s.late?'(late)':''} ${s.submitted?'':'(missing)'}</label>`).join('');
+  $('cwStatus').textContent='Loaded '+classroomStudents.length+' students. Select submitted students to download.';
+};
+$('btnDownloadSelected').onclick=async()=>{
+  const ids=[...document.querySelectorAll('.cwStudent:checked')].map(x=>x.value);
+  const j=await api('/api/classroom/download','POST',{courseId:$('cwCourse').value,courseworkId:$('cwWork').value,assignmentKey:$('cwKey').value,assignmentName:$('cwName').value,userIds:ids});
+  $('cwStatus').textContent=j.ok?'Downloaded and organized '+(j.manifest.submissions||[]).length+' submissions.':('Error: '+j.error);
+  if(j.ok)loadAssign();
+};
+loadClassroomCourses();
 // files
 async function loadAssign(){const a=await api('/api/assignments');$('fAssign').innerHTML=a.map(x=>`<option>${x.key}</option>`).join('');
 $('fAssign').onchange=()=>{const cur=a.find(x=>x.key===$('fAssign').value);$('fFile').innerHTML=(cur?cur.files:[]).map(f=>`<option>${f}</option>`).join('');loadPdf();};
@@ -266,5 +328,15 @@ $('aReview').textContent=j.needsReview.length?('Needs Review: '+j.needsReview.jo
 $('btnAiApprove').onclick=async()=>{if(!aiPayload)return;const j=await api('/api/ai/approve','POST',{payload:aiPayload});alert(j.ok?('Saved: '+j.assignments.join(', ')):'Error');};
 $('btnAiCopy').onclick=()=>{navigator.clipboard.writeText($('aOut').textContent);};
 loadAiCfg();
+
+async function loadTemplate(){
+ const j=await api('/api/report/template');
+ if(j.ok){$('tplHeader').value=j.template.header;$('tplNoteHeader').value=j.template.note_header;}
+}
+$('btnTemplateSave').onclick=async()=>{
+ const j=await api('/api/report/template','POST',{header:$('tplHeader').value,note_header:$('tplNoteHeader').value});
+ $('tplStatus').textContent=j.ok?'Saved.':'Error: '+j.error;
+};
+loadTemplate();
 </script>
 </body></html>

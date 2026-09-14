@@ -52,7 +52,7 @@ def resolve_batch(sections: list[dict], iso_dates: list[str], students: list[dic
                 status = "missing" if e["type"] == "missing" else "not_on_classroom"
                 item["text"] = report_engine.format_status_report(
                     official_name=official, year=year, day=day, month=month,
-                    weekday=weekday, status=status)
+                    weekday=weekday, status=status, rules=rules)
             resolved.append(item)
         # Roster completes the day: an active student with no entry at all is
         # treated as missing (or not-on-classroom when onClassroom=false).
@@ -66,7 +66,7 @@ def resolve_batch(sections: list[dict], iso_dates: list[str], students: list[dic
                 "needsReview": False, "implicit": True, "entry": {},
                 "text": report_engine.format_status_report(
                     official_name=s["officialName"], year=year, day=day, month=month,
-                    weekday=weekday, status=status),
+                    weekday=weekday, status=status, rules=rules),
             })
         resolved.sort(key=lambda r: r["officialName"].lower())
         key = f"{iso}_hw"

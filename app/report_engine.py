@@ -177,10 +177,12 @@ def format_report(
 
 
 def format_status_report(*, official_name: str, year: str, day: int, month: int,
-                         weekday: str, status: str) -> str:
+                         weekday: str, status: str,
+                         rules: dict | None = None) -> str:
     """❌ Did not send HW / ⚠️ Not on Classroom blocks."""
     label = "❌ Did not send HW" if status == "missing" else "⚠️ Not on Classroom"
-    return f"📝HW Report\n{official_name} ({year} {day}/{month} {weekday})\n{label}"
+    header = (rules or load_rules()).get("formatting", {}).get("header", "📝HW Report")
+    return f"{header}\n{official_name} ({year} {day}/{month} {weekday})\n{label}"
 
 
 # ---------- parsing ----------
