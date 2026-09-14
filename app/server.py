@@ -38,7 +38,7 @@ import base64
 import json
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from . import batch, file_organizer, missing, report_engine, roster
 
@@ -167,7 +167,11 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, {"ok": True, "coursework": work})
         elif parsed.path == "/api/profile":
             from . import profiles
-            _send_json(self, {"profile": profiles.current()})
+            _send_json(self, {"profile": profiles.current(),
+                              "downloadPath": str(profiles.homework_dir())})
+        elif parsed.path == "/api/preferences":
+            from . import profiles
+            _send_json(self, {"downloadPath": str(profiles.homework_dir())})
         elif parsed.path == "/api/report/template":
             from . import profiles
             p = profiles.data_dir() / "report_template.json"
@@ -193,7 +197,8 @@ class Handler(SimpleHTTPRequestHandler):
         elif parsed.path.startswith("/homework/"):
             from . import profiles
             hwroot = profiles.homework_dir().resolve()
-            target = (hwroot / parsed.path[len("/homework/"):]).resolve()
+            relative = unquote(parsed.path[len("/homework/"):])
+            target = (hwroot / relative).resolve()
             if not str(target).startswith(str(hwroot)) or not target.is_file():
                 self.send_error(404)
                 return
@@ -204,6 +209,28 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/classroom/logout":
+            from . import classroom_auth
+            _send_json(self, {"ok": classroom_auth.logout()})
+            return
+        if parsed.path == "/api/preferences":
+            from . import profiles
+            data = _read_json(self)
+            value = str(data.get("downloadPath", "")).strip()
+            if not value:
+                _send_json(self, {"ok": False, "error": "downloadPath is required"}, 400)
+                return
+            path = Path(value).expanduser()
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+                pref = profiles.data_dir() / "preferences.json"
+                pref.write_text(json.dumps({"download_path": str(path)},
+                                           ensure_ascii=False, indent=2), encoding="utf-8")
+            except OSError as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
+                return
+            _send_json(self, {"ok": True, "downloadPath": str(path)})
+            return
         if parsed.path == "/api/students":
             students = _read_json(self).get("students", [])
             roster.save(students)

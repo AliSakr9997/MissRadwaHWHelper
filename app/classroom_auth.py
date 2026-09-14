@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from . import profiles
 
@@ -16,6 +17,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 CLIENT_SECRET_FILE = BASE_DIR / "config" / "client_secret.json"
 
 SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/classroom.courses.readonly",
     "https://www.googleapis.com/auth/classroom.rosters.readonly",
     "https://www.googleapis.com/auth/classroom.coursework.students.readonly",
@@ -213,7 +217,39 @@ def get_credentials(open_browser: bool = True, force_reauth: bool = False):
                     "and keep ALL permission checkboxes ticked.") from e
             raise AuthError(f"Google sign-in failed: {msg}") from e
         token_file.write_text(creds.to_json(), encoding="utf-8")
+    _assign_google_profile(creds, token_file)
     return creds
+
+
+def _assign_google_profile(creds, token_file: Path) -> None:
+    """Name the local profile after the authenticated Google account."""
+    import base64 as _base64
+    import json as _json
+    import shutil as _shutil
+    email = ""
+    raw = getattr(creds, "id_token", None)
+    if raw and isinstance(raw, str) and raw.count(".") == 2:
+        try:
+            body = raw.split(".")[1] + "==="
+            claims = _json.loads(_base64.urlsafe_b64decode(body))
+            email = str(claims.get("email", ""))
+        except (ValueError, TypeError, _json.JSONDecodeError):
+            pass
+    if not email:
+        return
+    local = email.split("@", 1)[0].lower()
+    local = re.sub(r"[^a-z0-9_-]+", "-", local).strip("-")[:40] or "teacher"
+    if local == profiles.current():
+        return
+    old = profiles.data_dir()
+    new = profiles.data_dir(local)
+    profiles.ensure_profile(local)
+    _shutil.copy2(token_file, profiles.token_file(local))
+    scopes = old / "granted_scopes.json"
+    if scopes.exists():
+        _shutil.copy2(scopes, new / "granted_scopes.json")
+    import os as _os
+    _os.environ["HW_PROFILE"] = local
 
 
 def logout() -> bool:

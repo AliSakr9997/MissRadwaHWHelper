@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import re
+import json
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -55,6 +56,17 @@ def token_file(profile: str | None = None) -> Path:
 
 
 def homework_dir(profile: str | None = None) -> Path:
+    configured = os.environ.get("HW_HOMEWORK_DIR", "").strip()
+    if configured and profile in (None, current()):
+        return Path(configured).expanduser()
+    pref = data_dir(profile) / "preferences.json"
+    if pref.exists():
+        try:
+            value = json.loads(pref.read_text(encoding="utf-8")).get("download_path", "")
+            if value:
+                return Path(value).expanduser()
+        except (OSError, ValueError, TypeError):
+            pass
     return data_dir(profile) / "homework"
 
 

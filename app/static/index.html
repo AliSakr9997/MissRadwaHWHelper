@@ -87,13 +87,12 @@ small{line-height:1.45}
 <div class="app-shell">
 <nav>
 <button data-tab="classroom" class="active">01 · Classroom</button>
-<button data-tab="reports">02 · Reports</button>
+<button data-tab="batch">02 · Reports &amp; Batch</button>
 <button data-tab="files">03 · Files &amp; Mark</button>
-<button data-tab="batch">04 · Batch paste</button>
-<button data-tab="airep">05 · AI Reports</button>
-<button data-tab="missing">06 · Missing HW</button>
-<button data-tab="roster">07 · Roster</button>
-<button data-tab="settings">08 · Profile &amp; Settings</button>
+<button data-tab="airep">04 · AI Reports</button>
+<button data-tab="missing">05 · Missing HW</button>
+<button data-tab="roster">06 · Roster</button>
+<button data-tab="settings">07 · Profile &amp; Settings</button>
 </nav>
 <main class="content">
 
@@ -104,8 +103,8 @@ small{line-height:1.45}
 <p>Classroom is the default source for submission and late status. Select the students to download; teacher notes can override status later in the report editor.</p>
 <div class="row"><div><label>Teacher class</label><select id="cwCourse"></select></div>
 <div><label>Assignment</label><select id="cwWork"></select></div></div>
-<label>Local assignment key</label><input id="cwKey" placeholder="2026-09-05_hw">
-<label>Assignment name</label><input id="cwName" placeholder="Fractions homework">
+<label>Local assignment key <small>(folder-safe date/identifier used to store this assignment locally)</small></label><input id="cwKey" placeholder="2026-09-05_hw">
+<label>Assignment name <small>(readable name used in PDF filenames and reports; it does not replace the Classroom title)</small></label><input id="cwName" placeholder="Fractions homework">
 <p><button class="primary" id="btnLoadSubmissions">Load students</button>
 <button class="ghost" id="btnDownloadSelected">Download selected files</button></p>
 <div id="cwStatus" class="warn">Sign in with Google when Classroom data is first requested.</div>
@@ -113,41 +112,20 @@ small{line-height:1.45}
 </div>
 </section>
 
-<!-- REPORTS -->
-<section id="tab-reports" class="tab">
-<div class="card">
-<h3>Teacher summary → Preview → Approve → Copy</h3>
-<label>Assignment key</label><input id="rKey" value="2026-09-05_example_assignment">
-<div class="row">
-<div><label>Student (official name / variant)</label><input id="rStudent" placeholder="Sara Ali"></div>
-<div><label>Or paste free-text shortcut</label><textarea id="rFree" rows="2" placeholder="Sara Ali&#10;46/54&#10;8 mistakes&#10;Very good&#10;Note: ..."></textarea></div>
-</div>
-<div class="row">
-<div><label>Grade num / den</label><div class="row"><input id="rNum" type="number" value="46"><input id="rDen" type="number" value="54"></div></div>
-<div><label>Date (ISO) + class year</label><div class="row"><input id="rDate" value="2026-09-05"><input id="rYear" value="Y8"></div></div>
-</div>
-<div class="row">
-<div><label>Mistakes</label><input id="rMis" type="number" value="8"></div>
-<div><label>Skipped</label><input id="rSkip" type="number" value="0"></div>
-</div>
-<div class="row">
-<div><label>Understanding</label><select id="rUnd"><option>excellent</option><option selected>very good</option><option>good</option><option>weak</option><option>poor</option></select></div>
-<div><label>Submission</label><select id="rOntime"><option value="1" selected>ontime</option><option value="0">late</option></select></div>
-</div>
-<label>Note</label><textarea id="rNote" rows="2">Study again the fraction flipping in dividing</textarea>
-<p><button class="primary" id="btnPreview">Preview</button>
-<button class="ghost" id="btnApprove" disabled>Approve &amp; save</button>
-<button class="ghost" id="btnCopy">Copy report</button></p>
-<div id="needsReview" class="warn" style="display:none">Needs Review: name did not match roster exactly.</div>
-<label>Final report (editable before saving)</label>
-<textarea id="finalReport" rows="14">Preview appears here…</textarea>
-</div>
-</section>
-
 <!-- BATCH -->
 <section id="tab-batch" class="tab">
 <div class="card">
-<h3>Batch paste — full log → full output document</h3>
+<h3>Reports &amp; batch paste — individual or full log</h3>
+<p>Use the individual report form for one student, or the batch form below for several students and days. Both produce editable output before saving.</p>
+<label>Individual assignment key</label><input id="rKey" value="2026-09-05_example_assignment">
+<div class="row"><div><label>Student</label><input id="rStudent" placeholder="Sara Ali"></div><div><label>Free-text shortcut</label><textarea id="rFree" rows="2" placeholder="Sara Ali&#10;46/54&#10;8 mistakes"></textarea></div></div>
+<div class="row"><div><label>Grade num / den</label><div class="row"><input id="rNum" type="number" value="46"><input id="rDen" type="number" value="54"></div></div><div><label>Date + year</label><div class="row"><input id="rDate" value="2026-09-05"><input id="rYear" value="Y8"></div></div></div>
+<div class="row"><div><label>Mistakes / skipped</label><div class="row"><input id="rMis" type="number" value="0"><input id="rSkip" type="number" value="0"></div></div><div><label>Understanding / submission</label><div class="row"><select id="rUnd"><option>excellent</option><option selected>very good</option><option>good</option><option>weak</option><option>poor</option></select><select id="rOntime"><option value="1" selected>on time</option><option value="0">late</option></select></div></div></div>
+<label>Teacher note</label><textarea id="rNote" rows="2" placeholder="Optional feedback"></textarea>
+<p><button class="primary" id="btnPreview">Preview individual</button><button class="ghost" id="btnApprove" disabled>Approve &amp; save</button><button class="ghost" id="btnCopy">Copy report</button></p>
+<textarea id="finalReport" rows="8">Preview appears here...</textarea>
+<div id="needsReview" class="warn" style="display:none"></div>
+<hr>
 <label>Paste (day sections separated by <code>-----</code> / <code>Monday HW</code> lines)</label>
 <textarea id="bText" rows="10" placeholder="Sara Ali&#10;Didn't send hw&#10;&#10;Omar Khaled&#10;46/54&#10;..."></textarea>
 <div class="row"><div><label>Dates per day section (comma ISO)</label><input id="bDates" value="2026-09-05,2026-09-07"></div>
@@ -162,8 +140,9 @@ small{line-height:1.45}
 
 <!-- AI REPORTS -->
 <section id="tab-airep" class="tab">
-<div class="card">
+<div class="card" id="aiConfigCard">
 <h3>AI provider (your own key, stored only on this machine)</h3>
+<p><small>Choose a provider, create its API key in that provider's developer dashboard, paste it below, save, then use Test connection. The key stays in this teacher profile and is never displayed in full.</small></p>
 <div class="row"><div><label>Provider</label><select id="aProv"></select></div>
 <div><label>Model</label><input id="aModel" list="aModelList" placeholder="e.g. gpt-4o-mini"><datalist id="aModelList"></datalist></div></div>
 <label>API key</label><input id="aKey" type="password" placeholder="never shown back, only ····last4">
@@ -235,7 +214,7 @@ small{line-height:1.45}
 <p><button class="ghost" id="btnLoadRoster">Reload</button>
 <button class="primary" id="btnSaveRoster">Save roster</button>
 <button class="ghost" id="btnAddRow">+ Add student</button></p>
-<table><thead><tr><th>id</th><th>officialName</th><th>arabicFirst</th><th>m/f</th><th>classroomId</th><th>variants (comma)</th><th>active</th><th>onClass</th></tr></thead>
+<table><thead><tr><th>ID <small>(local stable key)</small></th><th>Official name <small>(reports/display)</small></th><th>Arabic first</th><th>M/F</th><th>Classroom ID <small>(Google link)</small></th><th>variants (comma)</th><th>active</th><th>onClass</th></tr></thead>
 <tbody id="rosterBody"></tbody></table>
 </div>
 </section>
@@ -263,11 +242,16 @@ small{line-height:1.45}
 <section id="tab-settings" class="tab">
 <div class="card">
 <h3>Profile &amp; Settings</h3>
-<p>Manage the teacher profile, sign-in state, report templates, and AI connection for this local workspace.</p>
+<p>Manage the teacher profile, Google account, AI connection, report templates, and download location for this local workspace.</p>
 <div class="settings-grid">
 <div><label>Active teacher profile</label><input id="settingsProfile" readonly></div>
-<div><label>Google Classroom</label><button class="primary" id="btnSettingsSignIn">Sign in / refresh connection</button></div>
+<div><label>Google Classroom</label><button class="primary" id="btnSettingsSignIn">Sign out / switch account</button></div>
 </div>
+<div id="settingsPanel"></div>
+<label>Homework download folder <small>(where assignment folders, PDFs, marked overlays, and reports are stored)</small></label>
+<input id="downloadPath" placeholder="C:\Users\...\MissRadwaHomework">
+<button class="ghost" id="btnSaveDownloadPath">Save download folder</button>
+<p><small>Local assignment key is the safe folder identifier. Assignment name is the readable label used for organized filenames. The download folder controls the parent location for these local files; Google Classroom itself is not changed.</small></p>
 <div id="settingsStatus" class="warn" style="margin-top:18px">Your data stays in this local teacher profile.</div>
 </div>
 </section>
@@ -281,15 +265,15 @@ document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'))
 document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
 b.classList.add('active');$('tab-'+b.dataset.tab).classList.add('active');});
 async function api(p,m,b){const r=await fetch(p,{method:m||'GET',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});return r.json();}
+if($('aiConfigCard'))$('settingsPanel').appendChild($('aiConfigCard'));
+api('/api/profile').then(j=>{if(j.profile){$('profileTag').textContent='· profile: '+j.profile;$('settingsProfile').value=j.profile;}$('downloadPath').value=j.downloadPath||'';}).catch(()=>{});
 api('/api/classroom/setup').then(j=>{
   const el=$('signinSetup');
   if(!j.clientSecret){el.textContent='Setup needed: save your Desktop OAuth JSON as config/client_secret.json.';}
   else if(!j.clientSecretValid||j.clientType!=='installed'){el.textContent='Setup needed: use a valid Google OAuth Desktop app JSON file.';}
   else{el.textContent='Google OAuth client is ready. The first sign-in will ask for Classroom and Drive permissions.';}
 }).catch(()=>{$('signinSetup').textContent='Unable to check local Google setup.';});
-api('/api/profile').then(j=>{
-  if(j.profile){$('profileTag').textContent='· profile: '+j.profile;$('settingsProfile').value=j.profile;}
-}).catch(()=>{});
+if($('btnSaveDownloadPath'))$('btnSaveDownloadPath').onclick=async()=>{const j=await api('/api/preferences','POST',{downloadPath:$('downloadPath').value});$('settingsStatus').textContent=j.ok?'Download folder saved. Restart the launcher/server before the next download.':'Error: '+j.error;};
 async function signIn(){
   $('signinError').style.display='none';
   $('btnSignIn').disabled=true;
@@ -298,6 +282,7 @@ async function signIn(){
     const j=await api('/api/classroom/courses?reauth=1');
     if(!j.ok)throw new Error(j.error||'Google sign-in failed');
     $('signinScreen').classList.add('hidden');
+    const profile=await api('/api/profile'); if(profile.profile){$('profileTag').textContent='· profile: '+profile.profile;$('settingsProfile').value=profile.profile;}
     $('cwStatus').textContent='Connected. Choose a class and assignment.';
     await loadClassroomCourses();
   }catch(e){
@@ -306,7 +291,7 @@ async function signIn(){
   }finally{$('btnSignIn').disabled=false;$('btnSignIn').textContent='Sign in with Google';}
 }
 $('btnSignIn').onclick=signIn;
-$('btnSettingsSignIn').onclick=async()=>{await signIn();$('settingsStatus').textContent='Google Classroom connection refreshed.';};
+$('btnSettingsSignIn').onclick=async()=>{const j=await api('/api/classroom/logout','POST',{});$('signinScreen').classList.remove('hidden');$('settingsStatus').textContent=j.ok?'Signed out. Sign in again to switch Google account.':'No saved Google session; sign in to connect.';};
 // reports
 $('btnPreview').onclick=async()=>{
 const body={assignmentKey:$('rKey').value,student_query:$('rStudent').value,freeText:$('rFree').value||undefined,
@@ -347,13 +332,14 @@ $('btnLoadSubmissions').onclick=async()=>{
   (j.submitted||[]).forEach((name,i)=>rosterNames[(j.submittedIds||[])[i]]=name);
   (j.missing||[]).forEach((name,i)=>rosterNames[(j.missingIds||[])[i]]=name);
   classroomStudents=Object.keys(rosterNames).map(id=>({id,name:rosterNames[id],submitted:(j.submittedIds||[]).includes(id),late:(j.lateIds||[]).includes(id)}));
-  $('cwStudents').innerHTML=classroomStudents.map(s=>`<label style="font-weight:normal"><input type="checkbox" class="cwStudent" value="${s.id}" ${s.submitted?'checked':''} ${s.submitted?'':'disabled'}> ${s.name} ${s.late?'(late)':''} ${s.submitted?'':'(missing)'}</label>`).join('');
-  $('cwStatus').textContent='Loaded '+classroomStudents.length+' students. Select submitted students to download.';
+  $('cwStudents').innerHTML=classroomStudents.map(s=>`<label style="font-weight:normal"><input type="checkbox" class="cwStudent" value="${s.id}" ${s.submitted?'checked':''} ${s.submitted?'':'disabled'}> ${s.name} — ${s.submitted?(s.late?'Submitted late':'Submitted on time'):'Did not submit'}</label>`).join('');
+  $('cwStatus').textContent='Loaded '+classroomStudents.length+' students. Checked boxes are submitted students selected for download. Missing students are disabled. Late and missing are independent: a student can submit late, submit on time, or not submit at all.';
 };
 $('btnDownloadSelected').onclick=async()=>{
   const ids=[...document.querySelectorAll('.cwStudent:checked')].map(x=>x.value);
   const j=await api('/api/classroom/download','POST',{courseId:$('cwCourse').value,courseworkId:$('cwWork').value,assignmentKey:$('cwKey').value,assignmentName:$('cwName').value,userIds:ids});
-  $('cwStatus').textContent=j.ok?'Downloaded and organized '+(j.manifest.submissions||[]).length+' submissions.':('Error: '+j.error);
+  const imageCount=j.ok?(j.manifest.submissions||[]).reduce((n,s)=>n+(s.attachments||[]).filter(a=>/image/i.test(a.kind||'')||/\.jpe?g|\.png/i.test(a.file||'')).length,0):0;
+  $('cwStatus').textContent=j.ok?'Downloaded and organized '+(j.manifest.submissions||[]).length+' submissions.'+(imageCount?' Note: '+imageCount+' image attachment(s) will be merged into a PDF during organization.':''):('Error: '+j.error);
   if(j.ok)loadAssign();
 };
 // files
