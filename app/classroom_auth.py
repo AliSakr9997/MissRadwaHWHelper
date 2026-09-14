@@ -130,8 +130,8 @@ h1{{margin:0 0 18px;font-size:clamp(2.2rem,8vw,4.8rem);line-height:.86;text-tran
 letter-spacing:-.08em}}p{{font-size:1.05rem;line-height:1.5}}
 </style></head><body>
 <div class="card"><h1>Classroom<br>HW Helper</h1>
-<p><b>Google sign-in completed.</b><br>Returning to the app...</p></div>
-<script>window.location.replace({app_url!r});</script>
+<p><b>Google sign-in completed.</b><br>Saving credentials, then returning to the app...</p></div>
+<script>setTimeout(function(){{window.location.replace('{app_url}');}},2000);</script>
 </body></html>""").encode("utf-8")
         start_response("200 OK", [("Content-Type", "text/html"),
                                   ("Content-Length", str(len(body)))])
@@ -305,6 +305,28 @@ def get_credentials(open_browser: bool = True, force_reauth: bool = False):
         raise AuthError(
             "config/client_secret.json not found — create a Desktop OAuth client in "
             "Google Cloud Console and save the JSON there (see README).")
+
+    # If a background auth flow is already running, wait for it instead of
+    # starting a second flow (which would open a duplicate browser tab).
+    with _auth_state["lock"]:
+        auth_in_progress = _auth_state["url"] and not _auth_state["done"]
+    if auth_in_progress:
+        import time as _time
+        deadline = _time.time() + 15
+        while _time.time() < deadline:
+            with _auth_state["lock"]:
+                if _auth_state["done"]:
+                    break
+            _time.sleep(0.3)
+        # Re-read token after waiting — the background thread should have saved it.
+        token_file = token_path()
+        if token_file.exists():
+            creds = Credentials.from_authorized_user_file(
+                str(token_file), _load_granted_scopes())
+            if creds and creds.valid:
+                _assign_google_profile(creds, token_file)
+                return creds
+
     token_file = token_path()
     if force_reauth:
         # A valid cached token otherwise bypasses Google completely. The

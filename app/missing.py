@@ -34,7 +34,9 @@ def assignment_date(key: str, meta: dict | None = None) -> tuple[int, int, str]:
         m = re.match(r"(\d{4})-(\d{2})-(\d{2})", key or "")
         iso = f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else "2026-09-05"
     d = datetime.strptime(iso, "%Y-%m-%d").date()
-    dt = datetime(d.year, d.month, d.day, 12, 0, tzinfo=ZoneInfo("Africa/Cairo"))
+    from . import report_engine
+    tz = report_engine.load_rules().get("timezone", "Africa/Cairo")
+    dt = datetime(d.year, d.month, d.day, 12, 0, tzinfo=ZoneInfo(tz))
     return d.day, d.month, dt.strftime("%A")
 
 

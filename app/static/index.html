@@ -372,6 +372,19 @@ if($('btnAddAiDate'))$('btnAddAiDate').onclick=()=>{addDateTo('aDates','aDatePic
 function setAccount(account){$('profileTag').textContent=account?'· '+account:'';$('settingsProfile').value=account||'Not signed in';}
 api('/api/profile').then(j=>{setAccount(j.account);$('downloadPath').value=j.downloadPath||'';}).catch(()=>setAccount(''));
 (async function checkExistingAuth(){
+  // If page loaded after a loopback redirect, auth may still be in progress.
+  // Poll auth-status until the background thread finishes saving the token.
+  try{
+    const st=await api('/api/classroom/auth-status');
+    if(st.url&&!st.done){
+      for(let i=0;i<30;i++){
+        await new Promise(r=>setTimeout(r,500));
+        const s=await api('/api/classroom/auth-status');
+        if(s.done)break;
+      }
+    }
+  }catch(e){}
+  // Now try to load courses with the (hopefully saved) token.
   try{
     const j=await api('/api/classroom/courses');
     if(j.ok&&j.courses&&j.courses.length>0){

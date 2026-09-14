@@ -83,8 +83,10 @@ def submission_label(ontime: bool) -> str:
     return "HW sent ontime 🟢" if ontime else "HW sent late 🔴"
 
 
-def weekday_name(iso_date: str, tz: str = "Africa/Cairo") -> str:
+def weekday_name(iso_date: str, tz: str | None = None) -> str:
     """iso_date 'YYYY-MM-DD' -> 'Saturday'. Raises ValueError on bad input."""
+    if tz is None:
+        tz = load_rules().get("timezone", "Africa/Cairo")
     d = datetime.strptime(iso_date, "%Y-%m-%d").date()
     dt = datetime(d.year, d.month, d.day, 12, 0, tzinfo=ZoneInfo(tz))
     return dt.strftime("%A")
