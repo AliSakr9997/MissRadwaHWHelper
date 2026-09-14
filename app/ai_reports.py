@@ -70,8 +70,8 @@ def interpret(text: str, provider_name: str, model: str, api_key: str,
     """Call the provider and return the raw structured dict (validated shape)."""
     provider = ai_providers.create(provider_name, api_key, base_url)
     roster = roster if roster is not None else report_engine.load_students()
-    system, _ = build_prompt(roster, year, default_dates or [])
-    raw = provider.chat_json(system, text, model)
+    system, user_intro = build_prompt(roster, year, default_dates or [])
+    raw = provider.chat_json(system, user_intro + "\n" + text, model)
     entries = raw.get("entries")
     if not isinstance(entries, list) or not entries:
         raise ai_providers.ProviderError("model returned no entries list")

@@ -173,6 +173,8 @@ class Handler(SimpleHTTPRequestHandler):
                     template = {}
             else:
                 template = {}
+            if not isinstance(template, dict):
+                template = {}
             defaults = report_engine.load_rules().get("formatting", {})
             _send_json(self, {"ok": True, "template": {
                 "header": template.get("header", defaults.get("header", "📝HW Report")),
@@ -205,6 +207,7 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, {"ok": True, "count": len(students)})
         elif parsed.path == "/api/report/template":
             from . import profiles
+            profiles.ensure_profile()
             data = _read_json(self)
             template = {k: str(data.get(k, "")).strip()
                         for k in ("header", "note_header")}
@@ -327,6 +330,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             try:
                 creds = classroom_auth.get_credentials()
+                students = roster.load()
+                reconciliation = classroom.reconcile(creds, data.get("courseId", ""),
+                                                     students)
+                if reconciliation["matched"]:
+                    roster.save(classroom.apply_reconcile(
+                        students, reconciliation["matched"]))
                 st = classroom.fetch_status(creds, data.get("courseId", ""),
                                             data.get("courseworkId", ""), roster.load())
                 missing.save_missing(data.get("assignmentKey", ""), st["missingIds"])
@@ -343,7 +352,8 @@ class Handler(SimpleHTTPRequestHandler):
                               "missing": [names.get(i, i) for i in st["missingIds"]],
                               "empty": [names.get(i, i) for i in st["emptyIds"]],
                               "late": [names.get(i, i) for i in st["lateIds"]],
-                              "unmapped": st["reviewIds"]})
+                              "unmapped": st["reviewIds"],
+                              "reconciliationReview": reconciliation["review"]})
         elif parsed.path == "/api/classroom/download":
             from . import classroom, classroom_auth
             data = _read_json(self)

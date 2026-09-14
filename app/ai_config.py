@@ -30,7 +30,8 @@ def _protect(value: str) -> str:
                                        ctypes.POINTER(ctypes.c_char)))
     out = _Blob()
     if not ctypes.windll.crypt32.CryptProtectData(
-            ctypes.byref(blob), "MissRadwaHWHelper", None, None, None, 0,
+            ctypes.byref(blob), ctypes.c_wchar_p("MissRadwaHWHelper"),
+            None, None, None, 0,
             ctypes.byref(out)):
         raise OSError("Windows could not protect the AI API key")
     try:

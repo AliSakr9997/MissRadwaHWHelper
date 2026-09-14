@@ -288,6 +288,10 @@ def download_assignment(creds, course_id: str, coursework_id: str,
                     n += 1
                 try:
                     kind = _download_drive_file(drive, fid, dest)
+                    if kind == "exported-pdf" and dest.suffix.lower() != ".pdf":
+                        renamed = dest.with_name(dest.name + ".pdf")
+                        dest.rename(renamed)
+                        dest = renamed
                     got.append({"kind": kind, "file": dest.name, "driveId": fid})
                 except Exception as e:
                     got.append({"kind": "error", "file": dest.name,

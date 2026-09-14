@@ -18,10 +18,12 @@ default browser automatically. Keep the black server window open while using
 the app; close it to stop the local server.
 
 Tabs: **1 · Reports** (form + free-text → preview → approve → copy),
-**2 · Batch paste** (multi-student log → full output document → approve all),
-**3 · Files & Mark** (PDF + stylus overlay → save to `marked/`),
-**4 · Roster** (local `students.json` wins, incl. Arabic names + m/f + onClassroom),
-**5 · Missing HW** (checklist → missing list → grouped Arabic messages + copy).
+**2 · Classroom** (choose a class, assignment, and selected submissions),
+**3 · Batch paste** (multi-student log → full output document → approve all),
+**4 · AI** (provider configuration → free-form log → validated reports),
+**5 · Files & Mark** (PDF + stylus overlay → save to `marked/`),
+**6 · Roster** (local `students.json` wins, incl. Arabic names + m/f + onClassroom),
+**7 · Missing HW** (checklist → missing list → grouped Arabic messages + copy).
 
 ## Batch paste (the daily workflow)
 

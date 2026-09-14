@@ -195,6 +195,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
 document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
 document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
 b.classList.add('active');$('tab-'+b.dataset.tab).classList.add('active');});
+const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(p,m,b){const r=await fetch(p,{method:m||'GET',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});return r.json();}
 api('/api/profile').then(j=>{if(j.profile)$('profileTag').textContent='· profile: '+j.profile;}).catch(()=>{});
 // reports
@@ -205,7 +206,7 @@ mistakes:+$('rMis').value,skipped:+$('rSkip').value,understanding:$('rUnd').valu
 note:$('rNote').value,iso_date:$('rDate').value,year:$('rYear').value,
 day:+$('rDate').value.split('-')[2],month:+$('rDate').value.split('-')[1]};
 const j=await api('/api/report/preview','POST',body);
-if(!j.ok){$('finalReport').value='Error: '+j.error;return;}
+if(!j.ok){$('finalReport').value='Error: '+j.error;$('btnApprove').disabled=true;$('btnApprove').onclick=null;return;}
 $('finalReport').value=j.report;$('needsReview').style.display=j.needsReview?'block':'none';
 $('btnApprove').disabled=false;$('btnApprove').onclick=async()=>{
 const s=await api('/api/report/approve','POST',{assignmentKey:$('rKey').value,studentId:j.officialName,officialName:j.officialName,teacherInput:body,finalReport:$('finalReport').value});
@@ -218,7 +219,7 @@ async function loadClassroomCourses(){
   const j=await api('/api/classroom/courses');
   if(!j.ok){$('cwStatus').textContent='Google sign-in/data error: '+(j.error||'unknown');return;}
   classroomCourses=j.courses||[];
-  $('cwCourse').innerHTML=classroomCourses.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  $('cwCourse').innerHTML=classroomCourses.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
   await loadClassroomWork();
 }
 async function loadClassroomWork(){
@@ -226,8 +227,10 @@ async function loadClassroomWork(){
   const j=await api('/api/classroom/work?courseId='+encodeURIComponent($('cwCourse').value));
   if(!j.ok){$('cwStatus').textContent='Could not load assignments: '+j.error;return;}
   classroomWork=j.coursework||[];
-  $('cwWork').innerHTML=classroomWork.map(w=>`<option value="${w.id}">${w.title}</option>`).join('');
-  const w=classroomWork[0];if(w){$('cwName').value=w.title;$('cwKey').value=new Date().toISOString().slice(0,10)+'_hw';}
+  $('cwWork').innerHTML=classroomWork.map(w=>`<option value="${esc(w.id)}">${esc(w.title)}</option>`).join('');
+  const setWorkDefaults=()=>{const w=classroomWork.find(x=>String(x.id)===$('cwWork').value);if(w){$('cwName').value=w.title;$('cwKey').value=new Date().toISOString().slice(0,10)+'_hw';}};
+  $('cwWork').onchange=setWorkDefaults;
+  setWorkDefaults();
 }
 $('cwCourse').onchange=loadClassroomWork;
 $('btnLoadSubmissions').onclick=async()=>{
@@ -237,7 +240,7 @@ $('btnLoadSubmissions').onclick=async()=>{
   (j.submitted||[]).forEach((name,i)=>rosterNames[(j.submittedIds||[])[i]]=name);
   (j.missing||[]).forEach((name,i)=>rosterNames[(j.missingIds||[])[i]]=name);
   classroomStudents=Object.keys(rosterNames).map(id=>({id,name:rosterNames[id],submitted:(j.submittedIds||[]).includes(id),late:(j.lateIds||[]).includes(id)}));
-  $('cwStudents').innerHTML=classroomStudents.map(s=>`<label style="font-weight:normal"><input type="checkbox" class="cwStudent" value="${s.id}" ${s.submitted?'checked':''} ${s.submitted?'':'disabled'}> ${s.name} ${s.late?'(late)':''} ${s.submitted?'':'(missing)'}</label>`).join('');
+  $('cwStudents').innerHTML=classroomStudents.map(s=>`<label style="font-weight:normal"><input type="checkbox" class="cwStudent" value="${esc(s.id)}" ${s.submitted?'checked':''} ${s.submitted?'':'disabled'}> ${esc(s.name)} ${s.late?'(late)':''} ${s.submitted?'':'(missing)'}</label>`).join('');
   $('cwStatus').textContent='Loaded '+classroomStudents.length+' students. Select submitted students to download.';
 };
 $('btnDownloadSelected').onclick=async()=>{
@@ -246,7 +249,6 @@ $('btnDownloadSelected').onclick=async()=>{
   $('cwStatus').textContent=j.ok?'Downloaded and organized '+(j.manifest.submissions||[]).length+' submissions.':('Error: '+j.error);
   if(j.ok)loadAssign();
 };
-loadClassroomCourses();
 // files
 async function loadAssign(){const a=await api('/api/assignments');$('fAssign').innerHTML=a.map(x=>`<option>${x.key}</option>`).join('');
 $('fAssign').onchange=()=>{const cur=a.find(x=>x.key===$('fAssign').value);$('fFile').innerHTML=(cur?cur.files:[]).map(f=>`<option>${f}</option>`).join('');loadPdf();};
@@ -290,7 +292,7 @@ $('mAssign').onchange=loadMissingAll;
 loadMissingTab();
 // classroom fetch
 async function loadCourses(){try{const j=await api('/api/classroom/courses');if(!j.ok)return;
-$('cCourse').innerHTML=j.courses.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+$('cCourse').innerHTML=j.courses.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
 loadWork();}catch(e){}}
 async function loadWork(){const id=$('cCourse').value;if(!id)return;try{const j=await api('/api/classroom/work?courseId='+encodeURIComponent(id));if(!j.ok)return;
 $('cWork').innerHTML=j.coursework.map(w=>`<option value="${w.id}">${w.title}</option>`).join('');}catch(e){}}
@@ -298,7 +300,11 @@ $('cCourse').onchange=loadWork;
 $('btnClassFetch').onclick=async()=>{const j=await api('/api/classroom/fetch','POST',{courseId:$('cCourse').value,courseworkId:$('cWork').value,assignmentKey:$('cKey').value});
 if(!j.ok){$('cResult').textContent='Error: '+j.error;return;}
 $('cResult').innerHTML='<b>Saved to '+j.assignmentKey+'</b><br>Missing: '+(j.missing.join(', ')||'none')+(j.empty.length?'<br>Empty turn-ins: '+j.empty.join(', '):'')+(j.unmapped.length?'<br>Unmapped: '+j.unmapped.length+' (see CLI reconcile)':'');loadMissingTab();};
-loadCourses();
+loadClassroomCourses().then(()=>{
+  $('cCourse').innerHTML=$('cwCourse').innerHTML;
+  $('cCourse').value=$('cwCourse').value;
+  loadWork();
+}).catch(()=>{});
 // batch
 let batchPayload=null;
 $('btnBatchPreview').onclick=async()=>{const j=await api('/api/batch/preview','POST',{text:$('bText').value,dates:$('bDates').value,year:$('bYear').value});
