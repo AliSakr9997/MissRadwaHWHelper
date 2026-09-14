@@ -108,7 +108,7 @@ small{line-height:1.45}
 <button data-tab="files">03 · Files &amp; Mark</button>
 <button data-tab="airep">04 · AI Reports</button>
 <button data-tab="missing">05 · Missing HW</button>
-<button data-tab="roster">06 · Roster</button>
+<button data-tab="roster">06 · Students</button>
 <button data-tab="settings">07 · Profile &amp; Settings</button>
 </nav>
 <main class="content">
@@ -257,11 +257,12 @@ small{line-height:1.45}
 <!-- ROSTER -->
 <section id="tab-roster" class="tab">
 <div class="card">
-<h3>Roster — local file wins</h3>
+<h3>Students — local file wins</h3>
 <p><button class="ghost" id="btnLoadRoster">Reload</button>
 <button class="primary" id="btnSaveRoster">Save roster</button>
-<button class="ghost" id="btnAddRow">+ Add student</button></p>
-<table><thead><tr><th>ID <small>(local stable key used by saved reports)</small></th><th>Official name <small>(the human name shown in reports)</small></th><th>Arabic first</th><th>M/F</th><th>Classroom ID <small>(Google's student link)</small></th><th>variants (comma)</th><th>active</th><th>onClass</th></tr></thead>
+<button class="ghost" id="btnAddRow">+ Add student</button>
+<button class="ghost" id="btnDeleteRow" style="color:var(--red)">Delete selected</button></p>
+<table><thead><tr><th><input type="checkbox" id="selectAll"></th><th>ID <small>(local stable key used by saved reports)</small></th><th>Official name <small>(the human name shown in reports)</small></th><th>Arabic first</th><th>M/F</th><th>Classroom ID <small>(Google's student link)</small></th><th>variants (comma)</th><th>active</th><th>onClass</th></tr></thead>
 <tbody id="rosterBody"></tbody></table>
 </div>
 </section>
@@ -372,7 +373,7 @@ if($('btnAddBatchDate'))$('btnAddBatchDate').onclick=()=>{addDateTo('bDates','bD
 if($('btnAddAiDate'))$('btnAddAiDate').onclick=()=>{addDateTo('aDates','aDatePicker','aDatesList');$('aDatePicker').value='';};
 function setAccount(account){$('profileTag').textContent=account?'· '+account:'';$('settingsProfile').value=account||'Not signed in';}
 api('/api/profile').then(j=>{setAccount(j.account);$('downloadPath').value=j.downloadPath||'';}).catch(()=>setAccount(''));
-// Auth screen: check for existing token, populate Continue button
+// Auth screen: check for existing token, auto-load if valid, else show sign-in
 (async function initAuthScreen(){
   // If page loaded after a loopback redirect, auth may still be in progress.
   try{
@@ -386,16 +387,32 @@ api('/api/profile').then(j=>{setAccount(j.account);$('downloadPath').value=j.dow
     }
   }catch(e){}
   // Check if a saved token exists
+  let hasToken=false;
   try{
     const q=await api('/api/auth/quick');
     if(q.ok&&q.hasToken){
+      hasToken=true;
       $('btnContinue').style.display='block';
       $('continueEmail').textContent=q.email||'your account';
     }else{
       $('btnContinue').style.display='none';
     }
   }catch(e){}
-  // Always show the sign-in screen (never auto-load)
+  // If token exists, try to auto-load the app
+  if(hasToken){
+    try{
+      const j=await api('/api/classroom/courses');
+      if(j.ok&&j.courses&&j.courses.length>0){
+        $('signinScreen').classList.add('hidden');
+        const profile=await api('/api/profile'); setAccount(profile.account);
+        $('cwStatus').textContent='Connected. Choose a class and assignment.';
+        await loadClassroomCourses();
+        await Promise.allSettled([loadAssign(),loadRoster(),loadMissingTab(),loadAiCfg(),loadTemplate()]);
+        return;
+      }
+    }catch(e){}
+  }
+  // No token or courses failed: show sign-in screen
   $('signinScreen').classList.remove('hidden');
   await Promise.allSettled([loadAssign(),loadRoster(),loadMissingTab(),loadAiCfg(),loadTemplate()]);
 })();
@@ -569,11 +586,13 @@ black:{c:$('presetBlackColor').value,s:+$('presetBlackSize').value}}[b.dataset.p
 if(p){$('markColor').value=p.c;$('markSize').value=p.s;}});
 document.querySelectorAll('.color-btn').forEach(b=>b.onclick=()=>{$('markColor').value=b.dataset.color;});
 // roster
-async function loadRoster(){const s=await api('/api/students');$('rosterBody').innerHTML=s.map((r,i)=>`<tr><td><input data-i="${i}" data-k="id" value="${r.id||''}"></td><td><input data-i="${i}" data-k="officialName" value="${r.officialName||''}"></td><td><input data-i="${i}" data-k="arabicFirst" value="${r.arabicFirst||''}"></td><td><select class="gender-select" data-i="${i}" data-k="gender"><option value="m" ${r.gender!=='f'?'selected':''}>M</option><option value="f" ${r.gender==='f'?'selected':''}>F</option></select></td><td><input data-i="${i}" data-k="classroomId" value="${r.classroomId||''}"></td><td><input data-i="${i}" data-k="variants" value="${(r.variants||[]).join(', ')}"></td><td><input type="checkbox" data-i="${i}" data-k="active" ${r.active===false?'':'checked'}></td><td><input type="checkbox" data-i="${i}" data-k="onClassroom" ${r.onClassroom===false?'':'checked'}></td></tr>`).join('');}
+async function loadRoster(){const s=await api('/api/students');$('rosterBody').innerHTML=s.map((r,i)=>`<tr><td><input type="checkbox" class="roster-sel"></td><td><input data-i="${i}" data-k="id" value="${r.id||''}"></td><td><input data-i="${i}" data-k="officialName" value="${r.officialName||''}"></td><td><input data-i="${i}" data-k="arabicFirst" value="${r.arabicFirst||''}"></td><td><select class="gender-select" data-i="${i}" data-k="gender"><option value="m" ${r.gender!=='f'?'selected':''}>M</option><option value="f" ${r.gender==='f'?'selected':''}>F</option></select></td><td><input data-i="${i}" data-k="classroomId" value="${r.classroomId||''}"></td><td><input data-i="${i}" data-k="variants" value="${(r.variants||[]).join(', ')}"></td><td><input type="checkbox" data-i="${i}" data-k="active" ${r.active===false?'':'checked'}></td><td><input type="checkbox" data-i="${i}" data-k="onClassroom" ${r.onClassroom===false?'':'checked'}></td></tr>`).join('');}
 $('btnLoadRoster').onclick=loadRoster;
-$('btnAddRow').onclick=()=>{$('rosterBody').insertAdjacentHTML('beforeend','<tr><td><input data-k="id"></td><td><input data-k="officialName"></td><td><input data-k="arabicFirst"></td><td><select class="gender-select" data-k="gender"><option value="m">M</option><option value="f">F</option></select></td><td><input data-k="classroomId"></td><td><input data-k="variants"></td><td><input type="checkbox" data-k="active" checked></td><td><input type="checkbox" data-k="onClassroom" checked></td></tr>');};
+$('btnAddRow').onclick=()=>{$('rosterBody').insertAdjacentHTML('beforeend','<tr><td><input type="checkbox" class="roster-sel"></td><td><input data-k="id"></td><td><input data-k="officialName"></td><td><input data-k="arabicFirst"></td><td><select class="gender-select" data-k="gender"><option value="m">M</option><option value="f">F</option></select></td><td><input data-k="classroomId"></td><td><input data-k="variants"></td><td><input type="checkbox" data-k="active" checked></td><td><input type="checkbox" data-k="onClassroom" checked></td></tr>');};
 $('btnSaveRoster').onclick=async()=>{const rows=[...$('rosterBody').querySelectorAll('tr')];const students=rows.map(tr=>{const g=k=>tr.querySelector(`[data-k="${k}"]`);return{id:g('id').value.trim(),officialName:g('officialName').value.trim(),arabicFirst:g('arabicFirst').value.trim(),gender:g('gender').value,classroomId:g('classroomId').value.trim(),variants:g('variants').value.split(',').map(s=>s.trim()).filter(Boolean),active:g('active').checked,onClassroom:g('onClassroom').checked};});
 const j=await api('/api/students','POST',{students});alert(j.ok?'Saved '+j.count:'Error');};
+$('btnDeleteRow').onclick=()=>{const sel=[...$('rosterBody').querySelectorAll('.roster-sel:checked')];if(!sel.length){alert('No students selected');return;}if(!confirm('Delete '+sel.length+' student(s)?'))return;sel.forEach(cb=>cb.closest('tr').remove());};
+$('selectAll').onchange=()=>{document.querySelectorAll('.roster-sel').forEach(cb=>cb.checked=$('selectAll').checked);};
 loadRoster();
 // missing
 async function loadMissingTab(){const a=await api('/api/assignments');const s=await api('/api/students');

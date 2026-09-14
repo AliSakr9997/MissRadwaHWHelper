@@ -237,6 +237,20 @@ class Handler(SimpleHTTPRequestHandler):
                             email = "(signed in)"
                     except (OSError, ValueError, TypeError):
                         pass
+            if not email or email == "(signed in)":
+                try:
+                    from . import classroom_auth
+                    creds = classroom_auth.get_credentials()
+                    if creds and creds.valid:
+                        from googleapiclient.discovery import build
+                        classroom_svc = build("classroom", "v1", credentials=creds, cache_discovery=False)
+                        profile = classroom_svc.userProfiles().get(userId="me").execute()
+                        email = str(profile.get("emailAddress", "")).strip()
+                        if email:
+                            email_file.parent.mkdir(parents=True, exist_ok=True)
+                            email_file.write_text(email, encoding="utf-8")
+                except Exception:
+                    pass
             _send_json(self, {"profile": profiles.current(), "account": email,
                               "downloadPath": str(profiles.homework_dir())})
         elif parsed.path == "/api/preferences":
@@ -537,7 +551,7 @@ class Handler(SimpleHTTPRequestHandler):
                               "late": [names.get(i, i) for i in st["lateIds"]],
                               "unmapped": st["reviewIds"]})
         elif parsed.path == "/api/classroom/download":
-            from . import classroom, classroom_auth
+            from . import classroom, classroom_auth, profiles
             data = _read_json(self)
             required = ("courseId", "courseworkId", "assignmentKey")
             if any(not data.get(k) for k in required):
