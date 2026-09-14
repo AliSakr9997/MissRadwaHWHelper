@@ -252,6 +252,17 @@ small{line-height:1.45}
 <p><button class="primary" id="btnSaveMarks">💾 Save marks</button></p>
 <small class="mark-help">Choose a mark tool first. Click a quick color or preset to set stroke color. Presets pair a color with a stroke/font size. Text, shapes, colors, opacity, undo/redo, and overlays are saved next to the PDF in <code>marked/</code>.</small>
 </div>
+<div style="border-top:3px solid var(--ink);padding-top:16px;margin-top:16px">
+<h3>Send grade to Classroom</h3>
+<div class="row">
+<div><label>Student</label><select id="fStudent"></select></div>
+<div><label>Grade</label><input id="fGrade" type="number" min="0" step="1" placeholder="e.g. 46"></div>
+<div><label>Max</label><input id="fMax" type="number" min="1" step="1" value="54"></div>
+</div>
+<label>Feedback (private comment)</label><textarea id="fFeedback" rows="3" placeholder="Optional: feedback for the student"></textarea>
+<p><label><input type="checkbox" id="fReturn"> Return to student (also sets grade)</label></p>
+<p><button class="primary" id="btnSendGrade">Send grade to Classroom</button> <span id="fGradeStatus"></span></p>
+</div>
 </section>
 
 <!-- ROSTER -->
@@ -544,6 +555,14 @@ async function loadFilesWork(){
 $('fCourse').onchange=loadFilesWork;
 $('btnFetchFiles').onclick=async()=>{
   const nameEl=$('fWork').selectedOptions[0];
+  // Check if this assignment already has downloaded files
+  try{
+    const assigns=await api('/api/assignments');
+    const existing=assigns.find(a=>a.key===$('fKey').value);
+    if(existing&&existing.hasFiles){
+      if(!confirm('This assignment already has '+existing.files.length+' file(s). Re-download will merge new files. Continue?'))return;
+    }
+  }catch(e){}
   $('btnFetchFiles').disabled=true;$('btnFetchFiles').textContent='Downloading...';
   try{
     const j=await api('/api/classroom/download','POST',{
@@ -563,6 +582,33 @@ $('btnFetchFiles').onclick=async()=>{
   }finally{$('btnFetchFiles').disabled=false;$('btnFetchFiles').textContent='Fetch & Download from Classroom';}
 };
 loadFilesCourses();
+// grading — populate student dropdown from roster
+async function loadGradeStudents(){
+  const s=await api('/api/students');
+  $('fStudent').innerHTML=s.filter(x=>x.active!==false).map(x=>`<option value="${x.id}">${x.officialName}</option>`).join('');
+}
+loadGradeStudents();
+$('btnSendGrade').onclick=async()=>{
+  const studentId=$('fStudent').value;
+  const grade=+$('fGrade').value;
+  const max=+$('fMax').value;
+  const comment=$('fFeedback').value.trim();
+  const doReturn=$('fReturn').checked;
+  if(!studentId){$('fGradeStatus').textContent='Select a student';return;}
+  if(!grade&&grade!==0){$('fGradeStatus').textContent='Enter a grade';return;}
+  // Get course/work from the Files & Mark classroom selectors
+  const courseId=$('fCourse').value;
+  const courseworkId=$('fWork').value;
+  if(!courseId||!courseworkId){$('fGradeStatus').textContent='Select a course and assignment first';return;}
+  $('btnSendGrade').disabled=true;$('fGradeStatus').textContent='Sending...';
+  try{
+    const j=await api('/api/classroom/grade','POST',{courseId,courseworkId,studentId,grade,comment,return:doReturn});
+    if(!j.ok)throw new Error(j.error||'Failed');
+    $('fGradeStatus').textContent=j.returned?'Grade sent & returned to student':'Grade saved (draft)';
+  }catch(e){
+    $('fGradeStatus').textContent='Error: '+e.message;
+  }finally{$('btnSendGrade').disabled=false;}
+};
 // annotation
 let tool='pen',strokes=[],redoStack=[],cur=null,start=null;
 const cv=$('overlay'),ctx=cv.getContext('2d');

@@ -123,8 +123,8 @@ def save_payload(payload: dict) -> None:
     from . import file_organizer
     for d in payload["days"]:
         dirs = file_organizer.assignment_dirs(d["key"])
-        base = dirs["base"]
-        (base / "meta.json").write_text(json.dumps({"date": d["iso_date"]}, ensure_ascii=False),
+        data = dirs["data"]
+        (data / "meta.json").write_text(json.dumps({"date": d["iso_date"]}, ensure_ascii=False),
                                         encoding="utf-8")
         rf = dirs["data"] / "reports.json"
         try:

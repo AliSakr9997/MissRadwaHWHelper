@@ -46,7 +46,7 @@ def assignment_dirs(assignment_key: str) -> dict[str, Path]:
     }
     for p in paths.values():
         p.mkdir(parents=True, exist_ok=True)
-    for stub in ("reports.json", "missing.json"):
+    for stub in ("reports.json", "missing.json", "links.txt", "meta.json"):
         # Migrate old flat location into data/ if data/ is empty
         old = base / stub
         new = data / stub
@@ -54,10 +54,13 @@ def assignment_dirs(assignment_key: str) -> dict[str, Path]:
             if old.exists():
                 old.rename(new)
             else:
-                new.write_text("[]", encoding="utf-8")
+                if stub.endswith(".json"):
+                    new.write_text("[]", encoding="utf-8")
+                else:
+                    new.write_text("# link-only submissions, one URL per line\n", encoding="utf-8")
         elif old.exists() and old != new:
             old.unlink(missing_ok=True)
-    links = base / "links.txt"
+    links = data / "links.txt"
     if not links.exists():
         links.write_text("# link-only submissions, one URL per line\n", encoding="utf-8")
     return paths
@@ -214,6 +217,6 @@ def organize_originals(assignment_key: str, uid_to_official: dict[str, str],
 
 
 def record_link(assignment_key: str, official_name: str, url: str) -> None:
-    links = assignment_dirs(assignment_key)["base"] / "links.txt"
+    links = assignment_dirs(assignment_key)["data"] / "links.txt"
     with links.open("a", encoding="utf-8") as f:
         f.write(f"{sanitize(official_name)} :: {url.strip()}\n")

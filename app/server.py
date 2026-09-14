@@ -95,6 +95,8 @@ def _assignments() -> list[dict]:
     for base in sorted(p for p in hw.iterdir() if p.is_dir()):
         norm = base / "normalized"
         files = sorted([p.name for p in norm.glob("*.pdf")]) if norm.exists() else []
+        orig = base / "original"
+        has_files = any(orig.iterdir()) if orig.exists() else False
         data_dir = base / "data"
         data_dir.mkdir(exist_ok=True)
         for stub in ("reports.json", "missing.json"):
@@ -110,14 +112,15 @@ def _assignments() -> list[dict]:
         reports = json.loads((data_dir / "reports.json").read_text(encoding="utf-8"))
         missing = json.loads((data_dir / "missing.json").read_text(encoding="utf-8"))
         meta = {}
-        mf = base / "meta.json"
+        mf = data_dir / "meta.json"
         if mf.exists():
             try:
                 meta = json.loads(mf.read_text(encoding="utf-8"))
             except (OSError, ValueError, TypeError):
                 meta = {}
         out.append({"key": base.name, "name": meta.get("assignmentName", base.name),
-                    "files": files, "reportCount": len(reports), "missing": missing})
+                    "files": files, "reportCount": len(reports), "missing": missing,
+                    "hasFiles": has_files})
     return out
 
 
@@ -529,7 +532,7 @@ class Handler(SimpleHTTPRequestHandler):
                 creds = classroom_auth.get_credentials()
                 st = classroom.fetch_status(creds, data.get("courseId", ""),
                                             data.get("courseworkId", ""), roster.load())
-                meta_path = profiles.homework_dir() / str(data["assignmentKey"]) / "meta.json"
+                meta_path = profiles.homework_dir() / str(data["assignmentKey"]) / "data" / "meta.json"
                 meta_path.parent.mkdir(parents=True, exist_ok=True)
                 meta_path.write_text(json.dumps({
                     "date": str(data["assignmentKey"])[:10],
@@ -581,7 +584,8 @@ class Handler(SimpleHTTPRequestHandler):
                 organized = file_organizer.organize_originals(
                     str(data["assignmentKey"]), uid_to_name,
                     str(data.get("assignmentName") or "Homework"))
-                meta_path = profiles.homework_dir() / str(data["assignmentKey"]) / "meta.json"
+                meta_path = profiles.homework_dir() / str(data["assignmentKey"]) / "data" / "meta.json"
+                meta_path.parent.mkdir(parents=True, exist_ok=True)
                 meta_path.write_text(json.dumps({
                     "date": str(data["assignmentKey"])[:10],
                     "assignmentName": str(data.get("assignmentName") or "Homework")
@@ -591,6 +595,48 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             _send_json(self, {"ok": True, "manifest": manifest,
                               "organized": organized})
+        elif parsed.path == "/api/classroom/grade":
+            from . import classroom, classroom_auth, roster as roster_mod
+            data = _read_json(self)
+            required = ("courseId", "courseworkId", "studentId", "grade")
+            if any(not data.get(k) for k in required):
+                _send_json(self, {"ok": False,
+                                  "error": "courseId, courseworkId, studentId, grade required"},
+                           400)
+                return
+            try:
+                creds = classroom_auth.get_credentials()
+                # Resolve student's classroomId
+                students = roster_mod.load()
+                student = next((s for s in students if s["id"] == data["studentId"]), None)
+                if not student or not student.get("classroomId"):
+                    _send_json(self, {"ok": False, "error": "Student not found or no Classroom ID"}, 400)
+                    return
+                classroom_id = student["classroomId"]
+                sub_id = classroom.get_submission_id(
+                    creds, data["courseId"], data["courseworkId"], classroom_id)
+                if not sub_id:
+                    _send_json(self, {"ok": False, "error": "No submission found for this student"}, 400)
+                    return
+                grade = float(data["grade"])
+                comment = str(data.get("comment", "")).strip()
+                return_to_student = bool(data.get("return", False))
+                if return_to_student:
+                    ok = classroom.return_submission(
+                        creds, data["courseId"], data["courseworkId"],
+                        sub_id, comment=comment, grade=grade)
+                else:
+                    ok = classroom.grade_submission(
+                        creds, data["courseId"], data["courseworkId"],
+                        sub_id, grade)
+                if not ok:
+                    _send_json(self, {"ok": False, "error": "Failed to set grade on Classroom"}, 400)
+                    return
+            except Exception as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
+                return
+            _send_json(self, {"ok": True, "student": data["studentId"],
+                              "grade": grade, "returned": return_to_student})
         elif parsed.path == "/api/annotate/save":
             data = _read_json(self)
             key = data.get("assignmentKey", "2026-09-05_example_assignment")

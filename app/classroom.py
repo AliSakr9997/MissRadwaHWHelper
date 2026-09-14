@@ -300,3 +300,66 @@ def download_assignment(creds, course_id: str, coursework_id: str,
         manifest.append({"userId": s.get("userId"), "late": bool(s.get("late")),
                          "attachments": got})
     return {"assignmentKey": assignment_key, "submissions": manifest}
+
+
+# ---------------------------------------------------------------------------
+# Grade + return (write operations)
+# ---------------------------------------------------------------------------
+
+def get_submission_id(creds, course_id: str, coursework_id: str,
+                      user_id: str) -> str | None:
+    """Return the student submission ID for a given user, or None."""
+    svc = _service("classroom", "v1", creds)
+    try:
+        result = svc.courses().courseWork().studentSubmissions().list(
+            courseId=course_id, courseWorkId=coursework_id,
+            userId=user_id, pageSize=1).execute()
+        subs = result.get("studentSubmissions", [])
+        return subs[0]["id"] if subs else None
+    except Exception:
+        return None
+
+
+def grade_submission(creds, course_id: str, coursework_id: str,
+                     submission_id: str, grade: float,
+                     max_points: float | None = None) -> bool:
+    """Set the draft grade on a submission. Returns True on success."""
+    svc = _service("classroom", "v1", creds)
+    body = {"draftGrade": grade}
+    try:
+        svc.courses().courseWork().studentSubmissions().patch(
+            courseId=course_id, courseWorkId=coursework_id,
+            id=submission_id, updateMask="draftGrade",
+            body=body).execute()
+        return True
+    except Exception:
+        return False
+
+
+def return_submission(creds, course_id: str, coursework_id: str,
+                      submission_id: str,
+                      comment: str = "",
+                      grade: float | None = None) -> bool:
+    """Return the submission to the student with optional private comment.
+
+    If grade is provided, also sets draftGrade + assignedGrade before
+    returning.
+    """
+    svc = _service("classroom", "v1", creds)
+    try:
+        # Optionally set the grade first
+        if grade is not None:
+            svc.courses().courseWork().studentSubmissions().patch(
+                courseId=course_id, courseWorkId=coursework_id,
+                id=submission_id, updateMask="draftGrade,assignedGrade",
+                body={"draftGrade": grade, "assignedGrade": grade}).execute()
+        # Return with optional private comment
+        body = {}
+        if comment:
+            body["privateComment"] = comment
+        svc.courses().courseWork().studentSubmissions().return_(
+            courseId=course_id, courseWorkId=coursework_id,
+            id=submission_id, body=body).execute()
+        return True
+    except Exception:
+        return False

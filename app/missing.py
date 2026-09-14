@@ -111,7 +111,7 @@ def save_missing(assignment_key: str, missing_ids: list[str],
 def assignment_meta(assignment_key: str) -> dict:
     # Read-only: must NOT create folders as a side effect.
     from . import profiles
-    mf = profiles.homework_dir() / assignment_key / "meta.json"
+    mf = profiles.homework_dir() / assignment_key / "data" / "meta.json"
     if mf.exists():
         try:
             return json.loads(mf.read_text(encoding="utf-8"))
