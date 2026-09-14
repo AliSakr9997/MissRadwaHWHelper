@@ -17,9 +17,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 CLIENT_SECRET_FILE = BASE_DIR / "config" / "client_secret.json"
 
 SCOPES = [
-    "openid",
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/classroom.courses.readonly",
     "https://www.googleapis.com/auth/classroom.rosters.readonly",
     "https://www.googleapis.com/auth/classroom.coursework.students.readonly",
@@ -112,9 +109,14 @@ def _loopback_authorize(client_secret: str, scopes: list[str],
 
     def _app(environ, start_response):
         captured["query"] = environ.get("QUERY_STRING", "")
-        body = ("<html><body style='font-family:sans-serif'>"
-                "<h3>The authentication flow has completed. You may close this window.</h3>"
-                "</body></html>").encode("utf-8")
+        body = ("""<!doctype html><html><head><meta charset="utf-8">
+<title>MissRadwaHWHelper sign-in complete</title>
+<style>body{font-family:Arial,sans-serif;text-align:center;padding:48px}
+h3{margin-bottom:10px}small{color:#555}</style></head><body>
+<h3>Google sign-in completed.</h3>
+<small>This window will close automatically in 3 seconds.</small>
+<script>setTimeout(function(){window.close();},3000);</script>
+</body></html>""").encode("utf-8")
         start_response("200 OK", [("Content-Type", "text/html"),
                                   ("Content-Length", str(len(body)))])
         return [body]
@@ -226,6 +228,8 @@ def _assign_google_profile(creds, token_file: Path) -> None:
     import base64 as _base64
     import json as _json
     import shutil as _shutil
+    import urllib.parse as _urlparse
+    import urllib.request as _urlrequest
     email = ""
     raw = getattr(creds, "id_token", None)
     if raw and isinstance(raw, str) and raw.count(".") == 2:
@@ -234,6 +238,16 @@ def _assign_google_profile(creds, token_file: Path) -> None:
             claims = _json.loads(_base64.urlsafe_b64decode(body))
             email = str(claims.get("email", ""))
         except (ValueError, TypeError, _json.JSONDecodeError):
+            pass
+    if not email and getattr(creds, "token", None):
+        try:
+            query = _urlparse.urlencode({"access_token": creds.token})
+            with _urlrequest.urlopen(
+                    "https://oauth2.googleapis.com/tokeninfo?" + query,
+                    timeout=10) as response:
+                claims = _json.loads(response.read().decode("utf-8"))
+            email = str(claims.get("email", ""))
+        except (OSError, ValueError, TypeError, _json.JSONDecodeError):
             pass
     if not email:
         return
