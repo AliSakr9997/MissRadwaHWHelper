@@ -36,6 +36,8 @@ from __future__ import annotations
 
 import base64
 import json
+import os
+import subprocess
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -178,7 +180,7 @@ class Handler(SimpleHTTPRequestHandler):
             from . import profiles
             email_file = profiles.data_dir() / "account_email.txt"
             email = email_file.read_text(encoding="utf-8").strip() if email_file.exists() else ""
-            _send_json(self, {"profile": profiles.current(), "account": email or profiles.current(),
+            _send_json(self, {"profile": profiles.current(), "account": email,
                               "downloadPath": str(profiles.homework_dir())})
         elif parsed.path == "/api/preferences":
             from . import profiles
@@ -272,6 +274,24 @@ class Handler(SimpleHTTPRequestHandler):
                     encoding="utf-8")
                 _send_json(self, {"ok": True, "downloadPath": str(path)})
             except (OSError, ImportError, RuntimeError, TclError) as e:
+                _send_json(self, {"ok": False, "error": str(e)}, 400)
+            return
+        if parsed.path == "/api/folder/open":
+            from . import profiles
+            key = str(_read_json(self).get("assignmentKey", "")).strip()
+            root = profiles.homework_dir().resolve()
+            target = (root / key).resolve() if key else root
+            if target != root and not str(target).startswith(str(root) + os.sep):
+                _send_json(self, {"ok": False, "error": "Invalid assignment folder"}, 400)
+                return
+            try:
+                target.mkdir(parents=True, exist_ok=True)
+                if os.name == "nt":
+                    subprocess.Popen(["explorer.exe", str(target)])
+                else:
+                    subprocess.Popen(["xdg-open", str(target)])
+                _send_json(self, {"ok": True, "path": str(target)})
+            except OSError as e:
                 _send_json(self, {"ok": False, "error": str(e)}, 400)
             return
         if parsed.path == "/api/students":

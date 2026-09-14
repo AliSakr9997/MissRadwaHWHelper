@@ -55,6 +55,10 @@ button.primary:active,button.ghost:active{transform:translate(2px,2px);box-shado
 .preset{min-width:86px}
 .copy-box{font-size:1rem;line-height:1.6;white-space:pre-wrap}
 .cwStudent,#mList input{width:20px;height:20px;vertical-align:middle}
+#mChecks small{display:block;font-size:1.1rem;line-height:1.55;margin-bottom:12px}
+#mList{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+#mList label{margin:0;padding:10px;border:2px solid var(--ink);font-size:1rem;text-transform:none;letter-spacing:0}
+.gender-select{min-width:82px!important;font-weight:800}
 .editor-controls{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:10px 0}
 .editor-controls label{margin:0;min-width:110px}
 .editor-controls input,.editor-controls select{width:auto;min-width:90px;padding:8px}
@@ -90,7 +94,7 @@ small{line-height:1.45}
 <div id="signinError" class="signin-error" style="display:none"></div>
 </div>
 </div>
-<header><b>CLASSROOM<br>HW HELPER</b><small>AI does admin · teacher does judgment</small> <small id="profileTag"></small></header>
+<header><b>CLASSROOM<br>HW HELPER</b><small>AI does admin · teacher does judgment <span id="profileTag"></span></small></header>
 <div class="app-shell">
 <nav>
 <button data-tab="classroom" class="active">01 · Classroom</button>
@@ -184,7 +188,7 @@ small{line-height:1.45}
 <section id="tab-files" class="tab">
 <div class="card">
 <h3>Files per assignment + stylus marking</h3>
-<label>Assignment name / date</label><select id="fAssign"></select>
+<label>Assignment name / date</label><div class="row"><select id="fAssign"></select><button class="ghost" id="btnOpenAssignmentFolder">Open assignment folder</button></div>
 <label>PDF file</label><select id="fFile"></select>
 <div class="toolbar">
 <button class="ghost" data-tool="pen">✏️ Pen</button>
@@ -243,7 +247,7 @@ small{line-height:1.45}
 <p><button class="primary" id="btnClassFetch">Fetch from Classroom</button></p>
 <div id="cResult"></div></div>
 <label>Assignment</label><select id="mAssign"></select>
-<div id="mChecks" class="card"><small>Tick students who <b>submitted</b>, then Compute.</small><div id="mList"></div></div>
+<div id="mChecks" class="card"><small>Tick the students who <b>submitted</b>. Leave students unticked if they did not submit, then click <b>Compute missing</b>.</small><div id="mList"></div></div>
 <p><button class="primary" id="btnComputeMissing">Compute missing</button>
 <button class="ghost" id="btnLoadMissing">Reload all missing</button></p>
 <div id="mMissing" class="copy-box"></div>
@@ -288,7 +292,8 @@ if($('templateCard'))$('settingsPanel').appendChild($('templateCard'));
 function addDateTo(inputId,pickerId){const value=$(pickerId).value;if(!value)return;const dates=$(inputId).value.split(',').map(x=>x.trim()).filter(Boolean);if(!dates.includes(value))dates.push(value);$(inputId).value=dates.join(',');}
 if($('btnAddBatchDate'))$('btnAddBatchDate').onclick=()=>addDateTo('bDates','bDatePicker');
 if($('btnAddAiDate'))$('btnAddAiDate').onclick=()=>addDateTo('aDates','aDatePicker');
-api('/api/profile').then(j=>{if(j.account){$('profileTag').textContent='· '+j.account;$('settingsProfile').value=j.account;}$('downloadPath').value=j.downloadPath||'';}).catch(()=>{});
+function setAccount(account){$('profileTag').textContent=account?'· '+account:'';$('settingsProfile').value=account||'Not signed in';}
+api('/api/profile').then(j=>{setAccount(j.account);$('downloadPath').value=j.downloadPath||'';}).catch(()=>setAccount(''));
 api('/api/classroom/setup').then(j=>{
   const el=$('signinSetup');
   if(!j.clientSecret){el.textContent='Setup needed: save your Desktop OAuth JSON as config/client_secret.json.';}
@@ -296,7 +301,7 @@ api('/api/classroom/setup').then(j=>{
   else{el.textContent='Google OAuth client is ready. The first sign-in will ask for Classroom and Drive permissions.';}
 }).catch(()=>{$('signinSetup').textContent='Unable to check local Google setup.';});
 if($('btnSaveDownloadPath'))$('btnSaveDownloadPath').onclick=async()=>{const j=await api('/api/preferences','POST',{downloadPath:$('downloadPath').value});$('settingsStatus').textContent=j.ok?'Download folder saved. Restart the launcher/server before the next download.':'Error: '+j.error;};
-if($('btnChooseDownloadPath'))$('btnChooseDownloadPath').onclick=async()=>{const j=await api('/api/preferences/choose','POST',{});if(j.ok){$('downloadPath').value=j.downloadPath;$('settingsStatus').textContent='Download folder selected and saved.';}else if(!j.cancelled)$('settingsStatus').textContent='Could not choose folder: '+(j.error||'unknown error');};
+if($('btnChooseDownloadPath'))$('btnChooseDownloadPath').onclick=async()=>{const j=await api('/api/preferences/choose','POST',{});if(j.ok){$('downloadPath').value=j.downloadPath;$('settingsStatus').textContent='Download folder selected and saved.';}else if(!j.cancelled)$('settingsStatus').textContent='Could not choose folder: '+(j.error||'unknown error')+'. You can type a full Windows path and click Save.';};
 async function signIn(){
   $('signinError').style.display='none';
   $('btnSignIn').disabled=true;
@@ -305,9 +310,10 @@ async function signIn(){
     const j=await api('/api/classroom/courses?reauth=1');
     if(!j.ok)throw new Error(j.error||'Google sign-in failed');
     $('signinScreen').classList.add('hidden');
-    const profile=await api('/api/profile'); if(profile.account){$('profileTag').textContent='· '+profile.account;$('settingsProfile').value=profile.account;}
+    const profile=await api('/api/profile'); setAccount(profile.account);
     $('cwStatus').textContent='Connected. Choose a class and assignment.';
     await loadClassroomCourses();
+    await Promise.allSettled([loadAssign(),loadRoster(),loadMissingTab(),loadAiCfg(),loadTemplate()]);
   }catch(e){
     $('signinError').textContent=e.message+' If this mentions an API or permission problem, enable Google Classroom API and Google Drive API, add this teacher as an OAuth test user, then remove the local Google connection and try again.';
     $('signinError').style.display='block';
@@ -371,6 +377,7 @@ $('btnDownloadSelected').onclick=async()=>{
 async function loadAssign(){const a=await api('/api/assignments');$('fAssign').innerHTML=a.map(x=>`<option value="${x.key}">${x.name||x.key} — ${x.key.slice(0,10)}</option>`).join('');
 $('fAssign').onchange=()=>{const cur=a.find(x=>x.key===$('fAssign').value);$('fFile').innerHTML=(cur?cur.files:[]).map(f=>`<option>${f}</option>`).join('');loadPdf();};
 $('fAssign').dispatchEvent(new Event('change'));}
+if($('btnOpenAssignmentFolder'))$('btnOpenAssignmentFolder').onclick=async()=>{const j=await api('/api/folder/open','POST',{assignmentKey:$('fAssign').value});if(!j.ok)alert('Could not open folder: '+j.error);};
 function fitCanvas(){const w=$('viewerWrap'),c=$('overlay');c.width=w.clientWidth;c.height=w.clientHeight;redraw();}
 function loadPdf(){const k=$('fAssign').value,f=$('fFile').value;if(!f)return;$('pdfEmbed').src=`/homework/${encodeURIComponent(k)}/normalized/${encodeURIComponent(f)}`;setTimeout(fitCanvas,300);}
 $('fFile').onchange=loadPdf;window.onresize=fitCanvas;loadAssign();
@@ -392,9 +399,9 @@ async function saveMarks(){const j=await api('/api/annotate/save','POST',{assign
 $('btnSaveMarks').onclick=saveMarks;$('btnSaveMarksBottom').onclick=saveMarks;
 document.querySelectorAll('.preset').forEach(b=>b.onclick=()=>{const p={red:['#d02020',3],blue:['#1040c0',5],black:['#121212',7]}[b.dataset.preset];$('markColor').value=p[0];$('markSize').value=p[1];});
 // roster
-async function loadRoster(){const s=await api('/api/students');$('rosterBody').innerHTML=s.map((r,i)=>`<tr><td><input data-i="${i}" data-k="id" value="${r.id||''}"></td><td><input data-i="${i}" data-k="officialName" value="${r.officialName||''}"></td><td><input data-i="${i}" data-k="arabicFirst" value="${r.arabicFirst||''}"></td><td><select data-i="${i}" data-k="gender"><option value="m" ${r.gender!=='f'?'selected':''}>m</option><option value="f" ${r.gender==='f'?'selected':''}>f</option></select></td><td><input data-i="${i}" data-k="classroomId" value="${r.classroomId||''}"></td><td><input data-i="${i}" data-k="variants" value="${(r.variants||[]).join(', ')}"></td><td><input type="checkbox" data-i="${i}" data-k="active" ${r.active===false?'':'checked'}></td><td><input type="checkbox" data-i="${i}" data-k="onClassroom" ${r.onClassroom===false?'':'checked'}></td></tr>`).join('');}
+async function loadRoster(){const s=await api('/api/students');$('rosterBody').innerHTML=s.map((r,i)=>`<tr><td><input data-i="${i}" data-k="id" value="${r.id||''}"></td><td><input data-i="${i}" data-k="officialName" value="${r.officialName||''}"></td><td><input data-i="${i}" data-k="arabicFirst" value="${r.arabicFirst||''}"></td><td><select class="gender-select" data-i="${i}" data-k="gender"><option value="m" ${r.gender!=='f'?'selected':''}>Male (M)</option><option value="f" ${r.gender==='f'?'selected':''}>Female (F)</option></select></td><td><input data-i="${i}" data-k="classroomId" value="${r.classroomId||''}"></td><td><input data-i="${i}" data-k="variants" value="${(r.variants||[]).join(', ')}"></td><td><input type="checkbox" data-i="${i}" data-k="active" ${r.active===false?'':'checked'}></td><td><input type="checkbox" data-i="${i}" data-k="onClassroom" ${r.onClassroom===false?'':'checked'}></td></tr>`).join('');}
 $('btnLoadRoster').onclick=loadRoster;
-$('btnAddRow').onclick=()=>{$('rosterBody').insertAdjacentHTML('beforeend','<tr><td><input data-k="id"></td><td><input data-k="officialName"></td><td><input data-k="arabicFirst"></td><td><select data-k="gender"><option value="m">m</option><option value="f">f</option></select></td><td><input data-k="classroomId"></td><td><input data-k="variants"></td><td><input type="checkbox" data-k="active" checked></td><td><input type="checkbox" data-k="onClassroom" checked></td></tr>');};
+$('btnAddRow').onclick=()=>{$('rosterBody').insertAdjacentHTML('beforeend','<tr><td><input data-k="id"></td><td><input data-k="officialName"></td><td><input data-k="arabicFirst"></td><td><select class="gender-select" data-k="gender"><option value="m">Male (M)</option><option value="f">Female (F)</option></select></td><td><input data-k="classroomId"></td><td><input data-k="variants"></td><td><input type="checkbox" data-k="active" checked></td><td><input type="checkbox" data-k="onClassroom" checked></td></tr>');};
 $('btnSaveRoster').onclick=async()=>{const rows=[...$('rosterBody').querySelectorAll('tr')];const students=rows.map(tr=>{const g=k=>tr.querySelector(`[data-k="${k}"]`);return{id:g('id').value.trim(),officialName:g('officialName').value.trim(),arabicFirst:g('arabicFirst').value.trim(),gender:g('gender').value,classroomId:g('classroomId').value.trim(),variants:g('variants').value.split(',').map(s=>s.trim()).filter(Boolean),active:g('active').checked,onClassroom:g('onClassroom').checked};});
 const j=await api('/api/students','POST',{students});alert(j.ok?'Saved '+j.count:'Error');};
 loadRoster();
