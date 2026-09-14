@@ -176,6 +176,9 @@ class Handler(SimpleHTTPRequestHandler):
             from . import classroom_auth
             status = classroom_auth.check_auth_status()
             _send_json(self, status)
+        elif parsed.path == "/api/auth/quick":
+            from . import classroom_auth
+            _send_json(self, {"ok": True, **classroom_auth.quick_auth_status()})
         elif parsed.path == "/api/classroom/work":
             from . import classroom, classroom_auth, profiles
             course = (parse_qs(parsed.query).get("courseId") or [None])[0]

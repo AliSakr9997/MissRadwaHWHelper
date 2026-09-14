@@ -62,6 +62,42 @@ def setup_status() -> dict:
     return status
 
 
+def quick_auth_status() -> dict:
+    """Lightweight check: does a token exist and is it possibly valid?
+
+    Returns {hasToken: bool, email: str} without making any network calls
+    (except a fast tokeninfo lookup if an access token is present).
+    """
+    tp = token_path()
+    if not tp.exists():
+        return {"hasToken": False, "email": ""}
+    email = ""
+    # Try reading from saved email file first
+    email_file = profiles.data_dir() / "account_email.txt"
+    if email_file.exists():
+        try:
+            email = email_file.read_text(encoding="utf-8").strip()
+        except (OSError, ValueError):
+            pass
+    # Fallback: try tokeninfo endpoint with the access token
+    if not email:
+        try:
+            import json as _json
+            import urllib.parse as _up
+            import urllib.request as _ur
+            tok = _json.loads(tp.read_text(encoding="utf-8"))
+            at = tok.get("token", "")
+            if at:
+                with _ur.urlopen(
+                    "https://oauth2.googleapis.com/tokeninfo?" + _up.urlencode({"access_token": at}),
+                    timeout=3) as resp:
+                    claims = _json.loads(resp.read().decode("utf-8"))
+                    email = str(claims.get("email", ""))
+        except Exception:
+            pass
+    return {"hasToken": True, "email": email}
+
+
 def token_path() -> Path:
     profiles.ensure_profile()
     return profiles.token_file()
