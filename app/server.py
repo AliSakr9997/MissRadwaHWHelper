@@ -39,6 +39,8 @@ import json
 import os
 import subprocess
 import threading
+import urllib.parse
+import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -180,6 +182,37 @@ class Handler(SimpleHTTPRequestHandler):
             from . import profiles
             email_file = profiles.data_dir() / "account_email.txt"
             email = email_file.read_text(encoding="utf-8").strip() if email_file.exists() else ""
+            if not email:
+                token_file = profiles.token_file()
+                try:
+                    token = json.loads(token_file.read_text(encoding="utf-8"))
+                    id_token = str(token.get("id_token", ""))
+                    if id_token.count(".") == 2:
+                        raw_claims = id_token.split(".")[1]
+                        raw_claims += "=" * (-len(raw_claims) % 4)
+                        claims = json.loads(base64.urlsafe_b64decode(
+                            raw_claims.encode("ascii")).decode("utf-8"))
+                        email = str(claims.get("email", "")).strip()
+                        if email:
+                            email_file.write_text(email, encoding="utf-8")
+                except (OSError, ValueError, TypeError, json.JSONDecodeError,
+                        UnicodeError):
+                    pass
+            if not email:
+                try:
+                        token = json.loads(profiles.token_file().read_text(encoding="utf-8"))
+                        access_token = str(token.get("token", "")).strip()
+                        if access_token:
+                            query = urllib.parse.urlencode({"access_token": access_token})
+                            with urllib.request.urlopen(
+                                    "https://oauth2.googleapis.com/tokeninfo?" + query,
+                                    timeout=5) as response:
+                                claims = json.loads(response.read().decode("utf-8"))
+                            email = str(claims.get("email", "")).strip()
+                            if email:
+                                email_file.write_text(email, encoding="utf-8")
+                except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                        pass
             _send_json(self, {"profile": profiles.current(), "account": email,
                               "downloadPath": str(profiles.homework_dir())})
         elif parsed.path == "/api/preferences":
