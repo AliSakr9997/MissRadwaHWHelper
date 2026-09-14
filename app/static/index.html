@@ -74,6 +74,7 @@ small{line-height:1.45}
 <h1>MISS RADWA<br>HW HELPER</h1>
 <p>Sign in with your Google teacher account to load your classes, assignments, students, and homework submissions.</p>
 <button class="primary" id="btnSignIn">Sign in with Google</button>
+<small class="signin-setup">Already connected to the wrong Google account? This button lets you choose an account again.</small>
 <small id="signinSetup" class="signin-setup">Checking local Google setup...</small>
 <div id="signinError" class="signin-error" style="display:none"></div>
 </div>
@@ -275,7 +276,7 @@ async function signIn(){
   $('btnSignIn').disabled=true;
   $('btnSignIn').textContent='Connecting...';
   try{
-    const j=await api('/api/classroom/courses');
+    const j=await api('/api/classroom/courses?reauth=1');
     if(!j.ok)throw new Error(j.error||'Google sign-in failed');
     $('signinScreen').classList.add('hidden');
     $('cwStatus').textContent='Connected. Choose a class and assignment.';

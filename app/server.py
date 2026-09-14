@@ -141,8 +141,9 @@ class Handler(SimpleHTTPRequestHandler):
             _send_json(self, {"ok": True, **classroom_auth.setup_status()})
         elif parsed.path == "/api/classroom/courses":
             from . import classroom, classroom_auth
+            force_reauth = (parse_qs(parsed.query).get("reauth") or ["0"])[0] == "1"
             try:
-                creds = classroom_auth.get_credentials()
+                creds = classroom_auth.get_credentials(force_reauth=force_reauth)
                 courses = [{"id": c["id"], "name": c.get("name", ""),
                             "state": c.get("courseState", "")}
                            for c in classroom.list_courses(creds)]

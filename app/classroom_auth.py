@@ -119,7 +119,8 @@ def _loopback_authorize(client_secret: str, scopes: list[str],
     port = server.server_port
     flow = InstalledAppFlow.from_client_secrets_file(client_secret, scopes)
     flow.redirect_uri = f"http://127.0.0.1:{port}/"
-    auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
+    auth_url, _ = flow.authorization_url(
+        prompt="select_account consent", access_type="offline")
     print("Visit this URL to authorize (teacher Google account, ALL boxes ticked):")
     print(auth_url)
     if open_browser:
@@ -159,7 +160,7 @@ def _loopback_authorize(client_secret: str, scopes: list[str],
     return flow, code, granted
 
 
-def get_credentials(open_browser: bool = True):
+def get_credentials(open_browser: bool = True, force_reauth: bool = False):
     """Return valid Credentials, running the localhost OAuth flow if needed.
 
     Raises AuthError with fix instructions instead of raw oauthlib tracebacks.
@@ -175,6 +176,11 @@ def get_credentials(open_browser: bool = True):
             "config/client_secret.json not found — create a Desktop OAuth client in "
             "Google Cloud Console and save the JSON there (see README).")
     token_file = token_path()
+    if force_reauth:
+        # A valid cached token otherwise bypasses Google completely. The
+        # explicit sign-in action must allow the teacher to switch accounts.
+        token_file.unlink(missing_ok=True)
+        scopes_path().unlink(missing_ok=True)
     creds = None
     if token_file.exists():
         creds = Credentials.from_authorized_user_file(str(token_file), _load_granted_scopes())
